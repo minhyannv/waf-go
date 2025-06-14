@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: waf-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: waf123456
+      MYSQL_DATABASE: waf
+      MYSQL_USER: waf
+      MYSQL_PASSWORD: waf123456
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/sql:/docker-entrypoint-initdb.d
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - waf-network
+    restart: unless-stopped
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: waf-redis
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - waf-network
+    restart: unless-stopped
+
+  # WAF 后端服务
+  waf-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: waf-backend
+    ports:
+      - "8081:8080"
+    environment:
+      - DATABASE_DSN=waf:waf123456@tcp(mysql:3306)/waf?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_ADDR=redis:6379
+      - JWT_SECRET=waf-production-secret-key-change-me
+      - TZ=Asia/Shanghai
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - waf-network
+    restart: unless-stopped
+    volumes:
+      - ./backend/config:/app/config
+      - /etc/localtime:/etc/localtime:ro
+
+  # WAF 前端服务
+  waf-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: waf-frontend
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "80:80"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - waf-backend
+    networks:
+      - waf-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  waf-network:
+    driver: bridge 
