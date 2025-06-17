@@ -32,44 +32,44 @@ export interface RuleListResponse {
 
 // 获取规则列表
 export const getRuleList = (params: RuleListParams) => {
-  return request.get<RuleListResponse>('/rules', { params })
+  return request.get<RuleListResponse>('/api/v1/rules', { params })
 }
 
 // 获取规则详情
 export const getRuleDetail = (id: number) => {
-  return request.get<Rule>(`/rules/${id}`)
+  return request.get<Rule>(`/api/v1/rules/${id}`)
 }
 
 // 创建规则
 export const createRule = (data: Omit<Rule, 'id' | 'created_at' | 'updated_at'>) => {
-  return request.post<Rule>('/rules', data)
+  return request.post<Rule>('/api/v1/rules', data)
 }
 
 // 更新规则
 export const updateRule = (id: number, data: Partial<Rule>) => {
-  return request.put<Rule>(`/rules/${id}`, data)
+  return request.put<Rule>(`/api/v1/rules/${id}`, data)
 }
 
 // 删除规则
 export const deleteRule = (id: number) => {
-  return request.delete(`/rules/${id}`)
+  return request.delete(`/api/v1/rules/${id}`)
 }
 
 // 切换规则状态
 export const toggleRuleStatus = (id: number, enabled: boolean) => {
-  return request.post(`/rules/${id}/toggle`)
+  return request.post(`/api/v1/rules/${id}/toggle`)
 }
 
 // 批量操作规则
 export const batchUpdateRules = (ids: number[], data: Partial<Rule>) => {
-  return request.patch('/rules/batch', { ids, ...data })
+  return request.patch('/api/v1/rules/batch', { ids, ...data })
 }
 
 // 导入规则
 export const importRules = (file: File) => {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post('/rules/import', formData, {
+  return request.post('/api/v1/rules/import', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
@@ -78,7 +78,7 @@ export const importRules = (file: File) => {
 
 // 导出规则
 export const exportRules = (params?: { ids?: number[] }) => {
-  return request.get('/rules/export', { 
+  return request.get('/api/v1/rules/export', { 
     params,
     responseType: 'blob'
   })

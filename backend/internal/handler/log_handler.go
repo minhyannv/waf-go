@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
+	"waf-go/internal/models"
 	"waf-go/internal/service"
+	"waf-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,6 +39,18 @@ func (h *LogHandler) GetAttackLogList(c *gin.Context) {
 	role := c.GetString("role")
 	if role != "admin" {
 		req.TenantID = c.GetUint("tenant_id")
+	}
+
+	// 处理时间范围
+	if startTime := c.Query("start_time"); startTime != "" {
+		if t, err := time.Parse("2006-01-02 15:04:05", startTime); err == nil {
+			req.StartTime = t
+		}
+	}
+	if endTime := c.Query("end_time"); endTime != "" {
+		if t, err := time.Parse("2006-01-02 15:04:05", endTime); err == nil {
+			req.EndTime = t
+		}
 	}
 
 	logs, total, err := h.logService.GetAttackLogList(&req)
@@ -234,4 +249,73 @@ func (h *LogHandler) CleanOldLogs(c *gin.Context) {
 		"message": "清理完成",
 		"data":    count,
 	})
+}
+
+// GetLogList 获取日志列表
+func (h *LogHandler) GetLogList(c *gin.Context) {
+	var query models.LogQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "无效的查询参数")
+		return
+	}
+
+	logs, total, err := h.logService.GetLogList(query)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "获取日志列表失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "获取日志列表成功", gin.H{
+		"total": total,
+		"list":  logs,
+	})
+}
+
+// GetLogDetail 获取日志详情
+func (h *LogHandler) GetLogDetail(c *gin.Context) {
+	logID := c.Param("id")
+	if logID == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "日志ID不能为空")
+		return
+	}
+
+	log, err := h.logService.GetLogDetail(logID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "获取日志详情失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "获取日志详情成功", log)
+}
+
+// DeleteLog 删除日志
+func (h *LogHandler) DeleteLog(c *gin.Context) {
+	logID := c.Param("id")
+	if logID == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "日志ID不能为空")
+		return
+	}
+
+	if err := h.logService.DeleteLog(logID); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "删除日志失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "删除日志成功", nil)
+}
+
+// BatchDeleteLogs 批量删除日志
+func (h *LogHandler) BatchDeleteLogs(c *gin.Context) {
+	var ids []string
+	if err := c.ShouldBindJSON(&ids); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "无效的请求参数")
+		return
+	}
+
+	if err := h.logService.BatchDeleteLogs(ids); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "批量删除日志失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "批量删除日志成功", nil)
 }

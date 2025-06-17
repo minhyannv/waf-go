@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -40,10 +41,22 @@ func (h *BlackListHandler) CreateBlackList(c *gin.Context) {
 
 	// 从JWT获取租户ID
 	claims, exists := c.Get("claims")
-	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
-			req.TenantID = userClaims.TenantID
-		}
+	fmt.Printf("Claims exists: %v\n", exists)
+
+	if !exists {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "未授权访问")
+		return
+	}
+
+	if userClaims, ok := claims.(*service.JWTClaims); ok {
+		fmt.Printf("Claims type assertion: %v\n", ok)
+
+		// 设置租户ID
+		req.TenantID = userClaims.TenantID
+		fmt.Printf("Setting tenant ID: %d\n", req.TenantID)
+	} else {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "无效的用户信息")
+		return
 	}
 
 	blacklist, err := h.blackListService.CreateBlackList(&req)
@@ -79,7 +92,7 @@ func (h *BlackListHandler) GetBlackListList(c *gin.Context) {
 	// 从JWT获取租户ID
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			req.TenantID = userClaims.TenantID
 		}
 	}
@@ -116,7 +129,7 @@ func (h *BlackListHandler) GetBlackListByID(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -160,7 +173,7 @@ func (h *BlackListHandler) UpdateBlackList(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -197,7 +210,7 @@ func (h *BlackListHandler) DeleteBlackList(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -236,7 +249,7 @@ func (h *BlackListHandler) BatchDeleteBlackList(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -272,7 +285,7 @@ func (h *BlackListHandler) ToggleBlackListStatus(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}

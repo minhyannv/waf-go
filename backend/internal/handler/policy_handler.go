@@ -6,6 +6,7 @@ import (
 
 	"waf-go/internal/logger"
 	"waf-go/internal/service"
+	"waf-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -38,19 +39,7 @@ func (h *PolicyHandler) CreatePolicy(c *gin.Context) {
 	tenantID := c.GetUint("tenant_id")
 	req.TenantID = tenantID
 
-	// 验证规则ID是否存在
-	if len(req.RuleIDs) > 0 {
-		err := h.policyService.ValidateRuleIDs(req.RuleIDs, tenantID)
-		if err != nil {
-			logger.Error("CreatePolicy - 规则ID验证失败", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": err.Error(),
-				"data":    nil,
-			})
-			return
-		}
-	}
+	// 规则ID验证现在在服务层处理
 
 	policy, err := h.policyService.CreatePolicy(&req)
 	if err != nil {
@@ -203,20 +192,7 @@ func (h *PolicyHandler) UpdatePolicy(c *gin.Context) {
 		return
 	}
 
-	// 验证规则ID是否存在
-	if req.RuleIDs != nil && len(req.RuleIDs) > 0 {
-		tenantID := c.GetUint("tenant_id")
-		err := h.policyService.ValidateRuleIDs(req.RuleIDs, tenantID)
-		if err != nil {
-			logger.Error("UpdatePolicy - 规则ID验证失败", zap.Error(err))
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": err.Error(),
-				"data":    nil,
-			})
-			return
-		}
-	}
+	// 规则ID验证现在在服务层处理
 
 	policy, err := h.policyService.UpdatePolicy(uint(id), &req)
 	if err != nil {
@@ -309,8 +285,11 @@ func (h *PolicyHandler) TogglePolicy(c *gin.Context) {
 // GetAvailableRules 获取可用的规则列表
 func (h *PolicyHandler) GetAvailableRules(c *gin.Context) {
 	tenantID := c.GetUint("tenant_id")
+	role := c.GetString("role")
 
-	rules, err := h.policyService.GetAvailableRules(tenantID)
+	logger.Debug("GetAvailableRules - Handler received", zap.Uint("tenant_id", tenantID), zap.String("role", role))
+
+	rules, err := h.policyService.GetAvailableRules(tenantID, role)
 	if err != nil {
 		logger.Error("GetAvailableRules - 服务层错误", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -362,4 +341,55 @@ func (h *PolicyHandler) BatchDeletePolicies(c *gin.Context) {
 		"message": "批量删除成功",
 		"data":    nil,
 	})
+}
+
+// GetPolicyRules 获取策略规则列表
+func (h *PolicyHandler) GetPolicyRules(c *gin.Context) {
+	policyIDStr := c.Param("id")
+	if policyIDStr == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "策略ID不能为空")
+		return
+	}
+
+	policyID, err := strconv.ParseUint(policyIDStr, 10, 32)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "无效的策略ID")
+		return
+	}
+
+	rules, err := h.policyService.GetPolicyRules(uint(policyID))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "获取策略规则失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "获取策略规则成功", rules)
+}
+
+// UpdatePolicyRules 更新策略规则
+func (h *PolicyHandler) UpdatePolicyRules(c *gin.Context) {
+	policyIDStr := c.Param("id")
+	if policyIDStr == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "策略ID不能为空")
+		return
+	}
+
+	policyID, err := strconv.ParseUint(policyIDStr, 10, 32)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "无效的策略ID")
+		return
+	}
+
+	var ruleIDs []uint
+	if err := c.ShouldBindJSON(&ruleIDs); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "无效的请求参数")
+		return
+	}
+
+	if err := h.policyService.UpdatePolicyRules(uint(policyID), ruleIDs); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "更新策略规则失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "更新策略规则成功", nil)
 }

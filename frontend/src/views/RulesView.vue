@@ -452,9 +452,14 @@ const handleSelectionChange = (selection: Rule[]) => {
 
 const toggleRule = async (row: Rule) => {
   try {
+    console.log('Toggling rule:', {
+      id: row.id,
+      enabled: row.enabled
+    })
     await toggleRuleStatus(row.id!, row.enabled)
     ElMessage.success('状态切换成功')
   } catch (error) {
+    console.error('Toggle rule error:', error)
     ElMessage.error('状态切换失败')
     row.enabled = !row.enabled // 回滚状态
   }

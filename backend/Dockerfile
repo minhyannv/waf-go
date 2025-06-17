@@ -55,7 +55,7 @@ RUN chown -R appuser:appgroup /app
 USER appuser
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 8081
 
 # 启动应用
 CMD ["./waf-server"] 

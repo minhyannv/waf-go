@@ -115,3 +115,60 @@ func (s *LogService) CleanOldLogs(days int) (int64, error) {
 
 	return result.RowsAffected, nil
 }
+
+// GetLogList 获取日志列表
+func (s *LogService) GetLogList(query models.LogQuery) ([]models.AttackLog, int64, error) {
+	var logs []models.AttackLog
+	var total int64
+
+	db := s.db.Model(&models.AttackLog{})
+
+	// 应用查询条件
+	if query.DomainID != "" {
+		db = db.Where("domain_id = ?", query.DomainID)
+	}
+	if !query.StartTime.IsZero() {
+		db = db.Where("created_at >= ?", query.StartTime)
+	}
+	if !query.EndTime.IsZero() {
+		db = db.Where("created_at <= ?", query.EndTime)
+	}
+	if query.RequestPath != "" {
+		db = db.Where("request_path LIKE ?", "%"+query.RequestPath+"%")
+	}
+	if query.ClientIP != "" {
+		db = db.Where("client_ip = ?", query.ClientIP)
+	}
+
+	// 获取总数
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 分页查询
+	offset := (query.Page - 1) * query.PageSize
+	if err := db.Offset(offset).Limit(query.PageSize).Find(&logs).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return logs, total, nil
+}
+
+// GetLogDetail 获取日志详情
+func (s *LogService) GetLogDetail(logID string) (*models.AttackLog, error) {
+	var log models.AttackLog
+	if err := s.db.First(&log, "id = ?", logID).Error; err != nil {
+		return nil, err
+	}
+	return &log, nil
+}
+
+// DeleteLog 删除日志
+func (s *LogService) DeleteLog(logID string) error {
+	return s.db.Delete(&models.AttackLog{}, "id = ?", logID).Error
+}
+
+// BatchDeleteLogs 批量删除日志
+func (s *LogService) BatchDeleteLogs(ids []string) error {
+	return s.db.Delete(&models.AttackLog{}, "id IN ?", ids).Error
+}

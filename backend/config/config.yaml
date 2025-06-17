@@ -1,12 +1,17 @@
 server:
-  port: ":8080"
+  http_port: 8081
   mode: "debug"
 
-database:
-  dsn: "root:password@tcp(localhost:3306)/waf?charset=utf8mb4&parseTime=True&loc=Local"
+mysql:
+  host: "127.0.0.1"
+  port: 3306
+  user: "waf"
+  password: "waf123456"
+  database: "waf"
 
 redis:
-  addr: "localhost:6379"
+  host: "127.0.0.1"
+  port: 6379
   password: ""
   db: 0
 

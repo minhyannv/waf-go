@@ -1,11 +1,27 @@
 package logger
 
 import (
+	"log"
+	"os"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+var (
+	InfoLogger  *log.Logger
+	WarnLogger  *log.Logger
+	ErrorLogger *log.Logger
+)
+
 var Logger *zap.Logger
+
+// InitLogger 初始化日志记录器
+func InitLogger() {
+	InfoLogger = log.New(os.Stdout, "[INFO] ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarnLogger = log.New(os.Stdout, "[WARN] ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
+}
 
 // Init 初始化日志
 func Init(level string) {
@@ -42,24 +58,24 @@ func Init(level string) {
 	}
 }
 
-// Info 信息日志
-func Info(msg string, fields ...zap.Field) {
-	Logger.Info(msg, fields...)
+// Info 记录信息日志
+func Info(format string, v ...interface{}) {
+	InfoLogger.Printf(format, v...)
+}
+
+// Warn 记录警告日志
+func Warn(format string, v ...interface{}) {
+	WarnLogger.Printf(format, v...)
+}
+
+// Error 记录错误日志
+func Error(format string, v ...interface{}) {
+	ErrorLogger.Printf(format, v...)
 }
 
 // Debug 调试日志
 func Debug(msg string, fields ...zap.Field) {
 	Logger.Debug(msg, fields...)
-}
-
-// Warn 警告日志
-func Warn(msg string, fields ...zap.Field) {
-	Logger.Warn(msg, fields...)
-}
-
-// Error 错误日志
-func Error(msg string, fields ...zap.Field) {
-	Logger.Error(msg, fields...)
 }
 
 // Fatal 致命错误日志

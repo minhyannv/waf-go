@@ -249,7 +249,8 @@ const searchForm = reactive({
   rule_name: '',
   action: '',
   start_time: '',
-  end_time: ''
+  end_time: '',
+  domain: ''
 })
 const pagination = reactive({
   page: 1,

@@ -22,7 +22,7 @@ export interface BlackListListResponse {
 // 创建黑名单
 export function createBlackList(data: Omit<BlackList, 'id' | 'created_at' | 'updated_at'>) {
   return request({
-    url: '/blacklists',
+    url: '/api/v1/blacklists',
     method: 'post',
     data
   })
@@ -37,7 +37,7 @@ export function getBlackListList(params: {
   enabled?: boolean
 }) {
   return request({
-    url: '/blacklists',
+    url: '/api/v1/blacklists',
     method: 'get',
     params
   })
@@ -46,7 +46,7 @@ export function getBlackListList(params: {
 // 获取黑名单详情
 export function getBlackListById(id: number) {
   return request({
-    url: `/blacklists/${id}`,
+    url: `/api/v1/blacklists/${id}`,
     method: 'get'
   })
 }
@@ -54,7 +54,7 @@ export function getBlackListById(id: number) {
 // 更新黑名单
 export function updateBlackList(id: number, data: Partial<BlackList>) {
   return request({
-    url: `/blacklists/${id}`,
+    url: `/api/v1/blacklists/${id}`,
     method: 'put',
     data
   })
@@ -63,7 +63,7 @@ export function updateBlackList(id: number, data: Partial<BlackList>) {
 // 删除黑名单
 export function deleteBlackList(id: number) {
   return request({
-    url: `/blacklists/${id}`,
+    url: `/api/v1/blacklists/${id}`,
     method: 'delete'
   })
 }
@@ -71,7 +71,7 @@ export function deleteBlackList(id: number) {
 // 批量删除黑名单
 export function batchDeleteBlackList(ids: number[]) {
   return request({
-    url: '/blacklists/batch',
+    url: '/api/v1/blacklists/batch',
     method: 'delete',
     data: ids
   })
@@ -80,7 +80,7 @@ export function batchDeleteBlackList(ids: number[]) {
 // 切换黑名单状态
 export function toggleBlackListStatus(id: number) {
   return request({
-    url: `/blacklists/${id}/toggle`,
+    url: `/api/v1/blacklists/${id}/toggle`,
     method: 'patch'
   })
 } 

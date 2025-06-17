@@ -15,7 +15,7 @@ export interface UserInfo {
 // 用户登录
 export function login(data: LoginForm) {
   return request({
-    url: '/auth/login',
+    url: '/api/v1/auth/login',
     method: 'post',
     data
   })
@@ -24,7 +24,7 @@ export function login(data: LoginForm) {
 // 获取用户信息
 export function getUserInfo() {
   return request({
-    url: '/auth/userinfo',
+    url: '/api/v1/auth/userinfo',
     method: 'get'
   })
 }
@@ -32,7 +32,7 @@ export function getUserInfo() {
 // 退出登录
 export function logout() {
   return request({
-    url: '/auth/logout',
+    url: '/api/v1/auth/logout',
     method: 'post'
   })
 } 

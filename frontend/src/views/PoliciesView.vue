@@ -151,21 +151,50 @@
             placeholder="请输入策略描述"
           />
         </el-form-item>
-        <el-form-item label="域名">
-          <el-input v-model="form.domain" placeholder="请输入域名，如：example.com" />
+        <el-form-item label="应用域名" prop="domain_id">
+          <el-select
+            v-model="form.domain_id"
+            placeholder="请选择要应用策略的域名"
+            style="width: 100%"
+            :loading="domainsLoading"
+            filterable
+          >
+            <el-option
+              v-for="domain in availableDomains"
+              :key="domain.id"
+              :label="`${domain.domain} (${domain.protocol}://${domain.domain}:${domain.port})`"
+              :value="domain.id"
+            >
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ domain.domain }}</span>
+                <div>
+                  <el-tag size="small" :type="domain.protocol === 'https' ? 'success' : 'info'">
+                    {{ domain.protocol.toUpperCase() }}
+                  </el-tag>
+                  <el-tag size="small" type="warning" style="margin-left: 4px;">
+                    :{{ domain.port }}
+                  </el-tag>
+                </div>
+              </div>
+            </el-option>
+          </el-select>
           <div class="form-tip">
-            <el-text size="small" type="info">
-              可选，指定策略适用的域名
+            <el-text size="small" type="warning">
+              <el-icon><Warning /></el-icon>
+              必须选择域名，策略将应用到指定域名的所有请求
             </el-text>
           </div>
         </el-form-item>
-        <el-form-item label="关联规则" prop="rule_ids">
+        <el-form-item label="关联规则">
           <el-select
             v-model="form.rule_ids"
             multiple
-            placeholder="请选择关联的规则"
+            placeholder="请选择关联的规则（可选）"
             style="width: 100%"
             :loading="rulesLoading"
+            collapse-tags
+            collapse-tags-tooltip
+            :max-collapse-tags="3"
           >
             <el-option
               v-for="rule in availableRules"
@@ -183,7 +212,7 @@
           </el-select>
           <div class="form-tip">
             <el-text size="small" type="info">
-              选择要应用到此策略的规则
+              可选，不选择规则时策略将允许所有请求通过
             </el-text>
           </div>
         </el-form-item>
@@ -260,30 +289,29 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search, Warning } from '@element-plus/icons-vue'
 import {
-  getPolicyList,
-  getPolicyWithRules,
-  createPolicy,
-  updatePolicy,
-  deletePolicy as deletePolicyApi,
-  togglePolicy,
-  batchDeletePolicies,
-  getAvailableRules,
-  type Policy,
+  policyApi,
+  type PolicyConfig,
+  type PolicyListRequest,
+  type PolicyListResponse,
   type PolicyWithRules
 } from '@/api/policies'
+import { domainApi, type DomainConfig } from '@/api/domains'
+import { formatTime } from '@/utils/format'
 
 // 响应式数据
 const loading = ref(false)
-const policies = ref<Policy[]>([])
-const selectedPolicies = ref<Policy[]>([])
+const policies = ref<PolicyConfig[]>([])
+const selectedPolicies = ref<PolicyConfig[]>([])
 const dialogVisible = ref(false)
 const detailVisible = ref(false)
 const isEdit = ref(false)
 const submitting = ref(false)
 const rulesLoading = ref(false)
+const domainsLoading = ref(false)
 const availableRules = ref<any[]>([])
+const availableDomains = ref<DomainConfig[]>([])
 const currentPolicy = ref<PolicyWithRules | null>(null)
 const currentPolicyRules = ref<any[]>([])
 const currentEditingPolicyId = ref<number | undefined>()
@@ -292,10 +320,10 @@ const currentEditingPolicyId = ref<number | undefined>()
 const formRef = ref<FormInstance>()
 
 // 搜索表单
-const searchForm = reactive({
+const searchForm = reactive<PolicyListRequest>({
   name: '',
   domain: '',
-  enabled: undefined as boolean | undefined
+  enabled: undefined
 })
 
 // 分页
@@ -309,7 +337,7 @@ const pagination = reactive({
 const form = reactive({
   name: '',
   description: '',
-  domain: '',
+  domain_id: undefined as number | undefined,
   rule_ids: [] as number[],
   enabled: true
 })
@@ -319,8 +347,8 @@ const formRules = {
   name: [
     { required: true, message: '请输入策略名称', trigger: 'blur' }
   ],
-  rule_ids: [
-    { required: true, message: '请选择至少一个规则', trigger: 'change' }
+  domain_id: [
+    { required: true, message: '请选择应用域名', trigger: 'change' }
   ]
 }
 
@@ -341,7 +369,7 @@ const loadPolicies = async () => {
       }
     })
 
-    const response = await getPolicyList(params)
+    const response = await policyApi.getPolicyList(params)
     policies.value = response.data.list
     pagination.total = response.data.total
   } catch (error) {
@@ -355,12 +383,26 @@ const loadPolicies = async () => {
 const loadAvailableRules = async () => {
   rulesLoading.value = true
   try {
-    const response = await getAvailableRules()
+    const response = await policyApi.getAvailableRules()
     availableRules.value = response.data
   } catch (error) {
     ElMessage.error('加载规则列表失败')
   } finally {
     rulesLoading.value = false
+  }
+}
+
+// 加载可用域名
+const loadDomains = async () => {
+  domainsLoading.value = true
+  try {
+    const response = await domainApi.getDomains({ enabled: true })
+    availableDomains.value = response.data.list
+  } catch (error) {
+    console.error('加载域名列表失败:', error)
+    ElMessage.error('加载域名列表失败')
+  } finally {
+    domainsLoading.value = false
   }
 }
 
@@ -379,22 +421,24 @@ const showCreateDialog = () => {
   resetForm()
   dialogVisible.value = true
   loadAvailableRules()
+  loadDomains()
 }
 
 // 显示编辑对话框
-const showEditDialog = (policy: Policy) => {
+const showEditDialog = (policy: PolicyConfig) => {
   isEdit.value = true
   // 保存当前编辑的策略ID
   currentEditingPolicyId.value = policy.id
   Object.assign(form, {
     name: policy.name,
     description: policy.description || '',
-    domain: policy.domain || '',
+    domain_id: policy.domain_id,
     rule_ids: Array.isArray(policy.rule_ids) ? policy.rule_ids : [],
     enabled: policy.enabled
   })
   dialogVisible.value = true
   loadAvailableRules()
+  loadDomains()
 }
 
 // 重置表单
@@ -402,7 +446,7 @@ const resetForm = () => {
   Object.assign(form, {
     name: '',
     description: '',
-    domain: '',
+    domain_id: undefined,
     rule_ids: [],
     enabled: true
   })
@@ -419,13 +463,14 @@ const submitForm = async () => {
 
   submitting.value = true
   try {
+    console.log('提交的表单数据:', form)
     if (isEdit.value) {
       if (currentEditingPolicyId.value) {
-        await updatePolicy(currentEditingPolicyId.value, form)
+        await policyApi.updatePolicy(currentEditingPolicyId.value, form)
         ElMessage.success('更新成功')
       }
     } else {
-      await createPolicy(form)
+      await policyApi.createPolicy(form)
       ElMessage.success('创建成功')
     }
     
@@ -439,11 +484,11 @@ const submitForm = async () => {
 }
 
 // 显示详情
-const showDetail = async (policy: Policy) => {
+const showDetail = async (policy: PolicyConfig) => {
   if (!policy.id) return
   
   try {
-    const response = await getPolicyWithRules(policy.id)
+    const response = await policyApi.getPolicyWithRules(policy.id)
     currentPolicy.value = response.data
     currentPolicyRules.value = response.data.rules || []
     detailVisible.value = true
@@ -453,12 +498,12 @@ const showDetail = async (policy: Policy) => {
 }
 
 // 切换状态
-const toggleStatus = async (policy: Policy) => {
+const toggleStatus = async (policy: PolicyConfig) => {
   if (!policy.id) return
   
   policy.toggling = true
   try {
-    await togglePolicy(policy.id)
+    await policyApi.togglePolicy(policy.id)
     ElMessage.success('状态切换成功')
   } catch (error) {
     // 恢复原状态
@@ -470,7 +515,7 @@ const toggleStatus = async (policy: Policy) => {
 }
 
 // 删除策略
-const deletePolicy = async (policy: Policy) => {
+const deletePolicy = async (policy: PolicyConfig) => {
   if (!policy.id) return
   
   try {
@@ -484,7 +529,7 @@ const deletePolicy = async (policy: Policy) => {
       }
     )
     
-    await deletePolicyApi(policy.id)
+    await policyApi.deletePolicy(policy.id)
     ElMessage.success('删除成功')
     loadPolicies()
   } catch (error) {
@@ -510,7 +555,7 @@ const batchDelete = async () => {
     )
     
     const ids = selectedPolicies.value.map(p => p.id!).filter(id => id)
-    await batchDeletePolicies(ids)
+    await policyApi.batchDeletePolicies(ids)
     ElMessage.success('批量删除成功')
     selectedPolicies.value = []
     loadPolicies()
@@ -522,22 +567,16 @@ const batchDelete = async () => {
 }
 
 // 处理选择变化
-const handleSelectionChange = (selection: Policy[]) => {
+const handleSelectionChange = (selection: PolicyConfig[]) => {
   selectedPolicies.value = selection
 }
 
 // 获取规则数量
-const getRuleCount = (policy: Policy) => {
+const getRuleCount = (policy: PolicyConfig) => {
   if (Array.isArray(policy.rule_ids)) {
     return policy.rule_ids.length
   }
   return 0
-}
-
-// 格式化时间
-const formatTime = (time?: string) => {
-  if (!time) return '-'
-  return new Date(time).toLocaleString('zh-CN')
 }
 
 // 获取匹配类型文本

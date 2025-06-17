@@ -1,12 +1,46 @@
 package router
 
 import (
+	"fmt"
+	"net/http"
+	"strings"
 	"waf-go/internal/handler"
 	"waf-go/internal/middleware"
 	"waf-go/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
+
+// WAF 中间件 - 应用于所有非管理接口
+func wafMiddleware(services *service.Services) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 跳过API请求
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.Next()
+			return
+		}
+
+		result, err := services.GetWAFEngine().CheckRequest(c)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "WAF check failed"})
+			c.Abort()
+			return
+		}
+
+		if result.Action == "block" {
+			services.GetWAFEngine().LogAttack(c, result)
+			c.JSON(result.StatusCode, gin.H{"message": result.Message})
+			c.Abort()
+			return
+		}
+
+		if result.Action == "log" {
+			services.GetWAFEngine().LogAttack(c, result)
+		}
+
+		c.Next()
+	}
+}
 
 func Init(services *service.Services) *gin.Engine {
 	r := gin.New()
@@ -20,6 +54,7 @@ func Init(services *service.Services) *gin.Engine {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Header("Content-Type", "application/json; charset=utf-8")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -29,39 +64,31 @@ func Init(services *service.Services) *gin.Engine {
 		c.Next()
 	})
 
-	// WAF 中间件 - 应用于所有非管理接口
-	wafMiddleware := services.WAFEngine.ProcessRequest()
-
 	// 创建处理器
-	authHandler := handler.NewAuthHandler(services.Auth)
-	ruleHandler := handler.NewRuleHandler(services.Rule)
-	policyHandler := handler.NewPolicyHandler(services.Policy)
-	logHandler := handler.NewLogHandler(services.Log)
-	dashboardHandler := handler.NewDashboardHandler(services.Dashboard)
-	whiteListHandler := handler.NewWhiteListHandler(services.WhiteList)
-	blackListHandler := handler.NewBlackListHandler(services.BlackList)
-	configHandler := handler.NewConfigHandler(services.Config)
+	authHandler := handler.NewAuthHandler(services.GetAuthService())
+	ruleHandler := handler.NewRuleHandler(services.GetRuleService())
+	policyHandler := handler.NewPolicyHandler(services.GetPolicyService())
+	logHandler := handler.NewLogHandler(services.GetLogService())
+	dashboardHandler := handler.NewDashboardHandler(services.GetDashboardService())
+	whiteListHandler := handler.NewWhiteListHandler(services.GetWhiteListService())
+	blackListHandler := handler.NewBlackListHandler(services.GetBlackListService())
+	configHandler := handler.NewConfigHandler(services.GetConfigService())
+	domainHandler := handler.NewDomainHandler(services.GetDomainService(), services.GetTenantSecurityService())
 
 	// API 路由组
 	api := r.Group("/api/v1")
 	{
-		// 认证路由（无需认证）
+		// 认证相关
 		auth := api.Group("/auth")
 		{
 			auth.POST("/login", authHandler.Login)
+			auth.GET("/userinfo", middleware.JWTAuth(), authHandler.GetUserInfo)
 		}
 
-		// 需要认证的路由
-		protected := api.Group("/")
-		protected.Use(middleware.AuthMiddleware())
+		// 需要认证的API
+		protected := api.Group("")
+		protected.Use(middleware.JWTAuth())
 		{
-			// 用户信息
-			protected.GET("/auth/userinfo", authHandler.GetUserInfo)
-
-			// 仪表盘
-			protected.GET("/dashboard/stats", dashboardHandler.GetDashboardStats)
-			protected.GET("/dashboard/realtime", dashboardHandler.GetRealtimeStats)
-
 			// 规则管理
 			rules := protected.Group("/rules")
 			{
@@ -70,6 +97,8 @@ func Init(services *service.Services) *gin.Engine {
 				rules.GET("/:id", ruleHandler.GetRule)
 				rules.PUT("/:id", ruleHandler.UpdateRule)
 				rules.DELETE("/:id", ruleHandler.DeleteRule)
+				rules.DELETE("/batch", ruleHandler.BatchDeleteRules)
+				rules.PATCH("/:id/toggle", ruleHandler.ToggleRule)
 				rules.POST("/:id/toggle", ruleHandler.ToggleRule)
 			}
 
@@ -79,23 +108,39 @@ func Init(services *service.Services) *gin.Engine {
 				policies.GET("", policyHandler.GetPolicyList)
 				policies.POST("", policyHandler.CreatePolicy)
 				policies.GET("/:id", policyHandler.GetPolicy)
-				policies.GET("/:id/rules", policyHandler.GetPolicyWithRules)
 				policies.PUT("/:id", policyHandler.UpdatePolicy)
 				policies.DELETE("/:id", policyHandler.DeletePolicy)
-				policies.POST("/:id/toggle", policyHandler.TogglePolicy)
 				policies.DELETE("/batch", policyHandler.BatchDeletePolicies)
-				policies.GET("/rules/available", policyHandler.GetAvailableRules)
+				policies.PATCH("/:id/toggle", policyHandler.TogglePolicy)
+				policies.GET("/:id/rules", policyHandler.GetPolicyRules)
+				policies.PUT("/:id/rules", policyHandler.UpdatePolicyRules)
 			}
 
 			// 日志管理
 			logs := protected.Group("/logs")
 			{
-				logs.GET("/attacks", logHandler.GetAttackLogList)
-				logs.GET("/attacks/:id", logHandler.GetAttackLogDetail)
-				logs.DELETE("/attacks/:id", logHandler.DeleteAttackLog)
-				logs.DELETE("/attacks/batch", logHandler.BatchDeleteAttackLogs)
-				logs.GET("/attacks/export", logHandler.ExportAttackLogs)
-				logs.POST("/attacks/clean", logHandler.CleanOldLogs)
+				// 攻击日志
+				attacks := logs.Group("/attacks")
+				{
+					attacks.GET("", logHandler.GetAttackLogList)
+					attacks.GET("/:id", logHandler.GetAttackLogDetail)
+					attacks.DELETE("/:id", logHandler.DeleteAttackLog)
+					attacks.DELETE("/batch", logHandler.BatchDeleteAttackLogs)
+					attacks.POST("/clean", logHandler.CleanOldLogs)
+					attacks.GET("/export", logHandler.ExportAttackLogs)
+				}
+			}
+
+			// 仪表盘
+			dashboard := protected.Group("/dashboard")
+			{
+				dashboard.GET("/stats", dashboardHandler.GetDashboardStats)
+				dashboard.GET("/overview", dashboardHandler.GetOverview)
+				dashboard.GET("/attack_trend", dashboardHandler.GetAttackTrend)
+				dashboard.GET("/top_rules", dashboardHandler.GetTopRules)
+				dashboard.GET("/top_ips", dashboardHandler.GetTopIPs)
+				dashboard.GET("/top_uris", dashboardHandler.GetTopURIs)
+				dashboard.GET("/top_user_agents", dashboardHandler.GetTopUserAgents)
 			}
 
 			// 白名单管理
@@ -130,16 +175,27 @@ func Init(services *service.Services) *gin.Engine {
 				config.POST("/reset", configHandler.ResetSystemConfig)
 				config.GET("/stats", configHandler.GetConfigStats)
 			}
+
+			// 域名管理
+			domains := protected.Group("/domains")
+			{
+				domains.GET("", domainHandler.GetDomainList)
+				domains.POST("", domainHandler.CreateDomain)
+				domains.GET("/:id", domainHandler.GetDomain)
+				domains.PUT("/:id", domainHandler.UpdateDomain)
+				domains.DELETE("/:id", domainHandler.DeleteDomain)
+				domains.POST("/:id/toggle", domainHandler.ToggleDomain)
+				domains.GET("/:id/policies", domainHandler.GetDomainPolicies)
+				domains.PUT("/:id/policies", domainHandler.UpdateDomainPolicies)
+				domains.DELETE("/batch", domainHandler.BatchDeleteDomains)
+			}
 		}
 	}
 
 	// 受保护的应用路由（应用WAF）
 	app := r.Group("/app")
-	app.Use(wafMiddleware)
+	app.Use(wafMiddleware(services))
 	{
-		// 这里可以添加实际的应用路由
-		// 例如：app.GET("/api/data", someHandler)
-
 		// 测试路由
 		app.GET("/test", func(c *gin.Context) {
 			c.JSON(200, gin.H{
@@ -151,10 +207,29 @@ func Init(services *service.Services) *gin.Engine {
 		// 触发WAF的测试路由
 		app.GET("/admin", func(c *gin.Context) {
 			c.JSON(200, gin.H{
-				"message": "Admin page",
+				"message": "Admin panel accessed!",
+				"ip":      c.ClientIP(),
 			})
 		})
 	}
+
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.Next()
+			return
+		}
+		wafMiddleware(services)(c)
+		if !c.IsAborted() {
+			proxy := services.GetDomainService().GetProxyManager().GetProxy(c.Request.Host)
+			if proxy == nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": fmt.Sprintf("Domain not found: %s", c.Request.Host),
+				})
+				return
+			}
+			proxy.ServeHTTP(c.Writer, c.Request)
+		}
+	})
 
 	return r
 }

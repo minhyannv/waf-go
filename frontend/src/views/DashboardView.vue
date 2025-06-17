@@ -80,7 +80,7 @@
       </el-col>
     </el-row>
 
-    <!-- 攻击趋势分析 - 单独一行 -->
+    <!-- 攻击趋势分析 -->
     <el-row :gutter="20" class="trend-section">
       <el-col :span="24">
         <el-card class="chart-card">
@@ -171,13 +171,13 @@
           <div class="top-list">
             <div
               v-for="(item, index) in (stats.top_attack_ips || [])"
-              :key="item.ip"
+              :key="item.client_ip"
               class="top-item"
-              @click="showIPDetail(item.ip)"
+              @click="showIPDetail(item.client_ip)"
             >
               <div class="rank" :class="getRankClass(index)">{{ index + 1 }}</div>
               <div class="item-content">
-                <div class="item-value">{{ item.ip }}</div>
+                <div class="item-value">{{ item.client_ip }}</div>
                 <div class="item-progress">
                   <el-progress 
                     :percentage="getPercentage(item.count, (stats.top_attack_ips || [])[0]?.count || 1)" 
@@ -206,13 +206,13 @@
           <div class="top-list">
             <div
               v-for="(item, index) in (stats.top_attack_uris || [])"
-              :key="item.uri"
+              :key="item.request_uri"
               class="top-item"
-              @click="showURIDetail(item.uri)"
+              @click="showURIDetail(item.request_uri)"
             >
               <div class="rank" :class="getRankClass(index)">{{ index + 1 }}</div>
               <div class="item-content">
-                <div class="item-value" :title="item.uri">{{ item.uri }}</div>
+                <div class="item-value" :title="item.request_uri">{{ item.request_uri }}</div>
                 <div class="item-progress">
                   <el-progress 
                     :percentage="getPercentage(item.count, (stats.top_attack_uris || [])[0]?.count || 1)" 
@@ -266,26 +266,6 @@
       </el-col>
     </el-row>
 
-    <!-- 实时监控 -->
-    <el-row :gutter="20" class="realtime-section">
-      <el-col :span="24">
-        <el-card class="realtime-card">
-          <template #header>
-            <div class="card-header">
-              <h3>实时攻击监控</h3>
-              <div class="realtime-status">
-                <el-tag :type="realtimeStatus.type" effect="dark">
-                  {{ realtimeStatus.text }}
-                </el-tag>
-                <span class="last-update">最后更新: {{ lastUpdateTime }}</span>
-              </div>
-            </div>
-          </template>
-          <div ref="realtimeChart" class="chart-container realtime-chart"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" :title="detailTitle" width="70%" :before-close="closeDetailModal">
       <div class="detail-content">
@@ -295,7 +275,7 @@
             <span class="detail-desc">显示攻击次数最多的IP地址</span>
           </div>
           <el-table :data="stats.top_attack_ips || []" style="width: 100%">
-            <el-table-column prop="ip" label="IP地址" width="200" />
+            <el-table-column prop="client_ip" label="IP地址" width="200" />
             <el-table-column prop="count" label="攻击次数" width="120" />
             <el-table-column label="占比" width="120">
               <template #default="scope">
@@ -305,7 +285,7 @@
 
             <el-table-column label="操作">
               <template #default="scope">
-                <el-button size="small" @click="addToBlacklist(scope.row.ip)">
+                <el-button size="small" @click="addToBlacklist(scope.row.client_ip)">
                   加入黑名单
                 </el-button>
               </template>
@@ -319,7 +299,7 @@
             <span class="detail-desc">显示被攻击最多的URI路径</span>
           </div>
           <el-table :data="stats.top_attack_uris || []" style="width: 100%">
-            <el-table-column prop="uri" label="URI路径" min-width="300" show-overflow-tooltip />
+            <el-table-column prop="request_uri" label="URI路径" min-width="300" show-overflow-tooltip />
             <el-table-column prop="count" label="攻击次数" width="120" />
             <el-table-column label="占比" width="120">
               <template #default="scope">
@@ -328,7 +308,7 @@
             </el-table-column>
             <el-table-column label="操作">
               <template #default="scope">
-                <el-button size="small" @click="addURIToBlacklist(scope.row.uri)">
+                <el-button size="small" @click="addURIToBlacklist(scope.row.request_uri)">
                   加入黑名单
                 </el-button>
               </template>
@@ -391,7 +371,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataAnalysis, 
@@ -406,42 +386,62 @@ import {
   VideoPause
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { getDashboardStats, getRealtimeStats } from '@/api/dashboard'
-import { createBlackList } from '@/api/blacklists'
-import type { DashboardStats } from '@/api/dashboard'
+import type { EChartsType } from 'echarts'
+import { 
+  getDashboardOverview,
+  getAttackTrend,
+  getTopRules,
+  getTopIPs,
+  getTopURIs,
+  getTopUserAgents,
+  type DashboardOverview,
+  type AttackTrend,
+  type TopRule,
+  type TopIP,
+  type TopURI
+} from '@/api/dashboard'
+import { createBlackList } from '@/api/blacklist'
 
-// 响应式数据
+interface DashboardStats {
+  total_requests: number
+  blocked_requests: number
+  allowed_requests: number
+  active_rules: number
+  active_policies: number
+  top_attack_ips: TopIP[]
+  top_attack_uris: TopURI[]
+  top_attack_rules: TopRule[]
+  top_attack_user_agents: Array<{ user_agent: string; count: number }>
+  hourly_stats: Array<{ hour: string; count: number }>
+  daily_stats: AttackTrend[]
+}
+
+// 数据加载和初始化
+const loading = ref(false)
 const stats = ref<DashboardStats>({
   total_requests: 0,
   blocked_requests: 0,
   allowed_requests: 0,
+  active_rules: 0,
+  active_policies: 0,
   top_attack_ips: [],
   top_attack_uris: [],
   top_attack_rules: [],
   top_attack_user_agents: [],
   hourly_stats: [],
-  daily_stats: [],
-  active_rules: 0,
-  active_policies: 0
+  daily_stats: []
 })
 
-const loading = ref(false)
 const autoRefresh = ref(false)
 const refreshInterval = ref<number>()
 const selectedDays = ref(7)
 const chartType = ref('daily')
 
-// 图表引用
-const trendChart = ref<HTMLElement>()
-const typeChart = ref<HTMLElement>()
-const realtimeChart = ref<HTMLElement>()
-
-// ECharts实例
+// 图表实例引用
+const trendChart = ref<HTMLElement | null>(null)
+const typeChart = ref<HTMLElement | null>(null)
 let trendChartInstance: echarts.ECharts | null = null
 let typeChartInstance: echarts.ECharts | null = null
-let realtimeChartInstance: echarts.ECharts | null = null
-
-// 趋势数据 - 已移除，改为显示静态信息
 
 // 详情弹窗
 const detailVisible = ref(false)
@@ -450,7 +450,7 @@ const detailType = ref('')
 
 // 计算属性
 const blockRate = computed(() => {
-  if (stats.value.total_requests === 0) return 0
+  if (!stats.value.total_requests) return 0
   return Math.round((stats.value.blocked_requests / stats.value.total_requests) * 100)
 })
 
@@ -467,20 +467,36 @@ const lastUpdateTime = ref('')
 const loadStats = async () => {
   loading.value = true
   try {
-    const response = await getDashboardStats(selectedDays.value)
-    const newStats = response.data
-    
-    // 计算趋势
-    calculateTrends(newStats)
-    
-    stats.value = newStats
-    lastUpdateTime.value = new Date().toLocaleTimeString()
-    
+    // 并行加载所有数据
+    const [overview, trend, rules, ips, uris, userAgents] = await Promise.all([
+      getDashboardOverview(),
+      getAttackTrend(selectedDays.value),
+      getTopRules(),
+      getTopIPs(),
+      getTopURIs(),
+      getTopUserAgents()
+    ])
+
+    // 更新统计数据
+    stats.value = {
+      ...stats.value,
+      total_requests: overview.data.total_attack_logs || 0,
+      blocked_requests: overview.data.blocked_requests || 0,
+      allowed_requests: overview.data.passed_requests || 0,
+      active_rules: overview.data.total_rules || 0,
+      active_policies: overview.data.total_policies || 0,
+      top_attack_ips: ips.data || [],
+      top_attack_uris: uris.data || [],
+      top_attack_rules: rules.data || [],
+      top_attack_user_agents: userAgents.data || [],
+      daily_stats: trend.data || []
+    }
+
     // 更新图表
-    await nextTick()
-    renderCharts()
+    await updateCharts()
   } catch (error) {
-    ElMessage.error('加载统计数据失败')
+    console.error('加载数据失败:', error)
+    ElMessage.error('加载数据失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -491,28 +507,26 @@ const calculateTrends = (newStats: DashboardStats) => {
 }
 
 const renderCharts = () => {
+  if (!stats.value) return
   renderTrendChart()
   renderTypeChart()
-  renderRealtimeChart()
 }
 
 const renderTrendChart = () => {
-  if (!trendChart.value) return
-  
-  if (!trendChartInstance) {
+  if (!trendChart.value || !stats.value?.daily_stats) return
+
+  if (!trendChartInstance && trendChart.value) {
     trendChartInstance = echarts.init(trendChart.value)
   }
-  
-  const data = chartType.value === 'daily' ? (stats.value.daily_stats || []) : (stats.value.hourly_stats || [])
-  const xAxisData = data.map(item => 'date' in item ? item.date : item.hour)
-  const seriesData = data.map(item => item.count)
-  
+
+  const chartData = chartType.value === 'hourly' 
+    ? stats.value.hourly_stats
+    : stats.value.daily_stats
+
   const option = {
     tooltip: {
       trigger: 'axis',
-      axisPointer: {
-        type: 'cross'
-      }
+      axisPointer: { type: 'cross' }
     },
     grid: {
       left: '3%',
@@ -522,72 +536,51 @@ const renderTrendChart = () => {
     },
     xAxis: {
       type: 'category',
-      data: xAxisData,
-      axisLine: {
-        lineStyle: {
-          color: '#e0e6ed'
+      data: chartData.map(item => {
+        if ('hour' in item) {
+          // 按小时显示时，只显示小时部分
+          return item.hour.split(' ')[1].substring(0, 5)
         }
-      }
+        // 按天显示时，只显示日期部分
+        return item.time.split(' ')[0]
+      }),
+      axisLine: { lineStyle: { color: '#e0e6ed' } }
     },
     yAxis: {
       type: 'value',
-      axisLine: {
-        lineStyle: {
-          color: '#e0e6ed'
-        }
-      }
+      axisLine: { lineStyle: { color: '#e0e6ed' } }
     },
-    series: [
-      {
-        name: '攻击次数',
-        type: 'line',
-        smooth: true,
-        symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: {
-          width: 3,
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: '#667eea' },
-            { offset: 1, color: '#764ba2' }
-          ])
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(102, 126, 234, 0.3)' },
-            { offset: 1, color: 'rgba(118, 75, 162, 0.1)' }
-          ])
-        },
-        data: seriesData
+    series: [{
+      name: '攻击次数',
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      data: chartData.map(item => item.count),
+      areaStyle: {
+        opacity: 0.1
+      },
+      lineStyle: {
+        width: 2
       }
-    ]
+    }]
   }
-  
-  trendChartInstance.setOption(option)
+
+  trendChartInstance?.setOption(option)
 }
 
 const renderTypeChart = () => {
-  if (!typeChart.value) return
-  
-  if (!typeChartInstance) {
+  if (!typeChart.value || !stats.value?.top_attack_rules) return
+
+  if (!typeChartInstance && typeChart.value) {
     typeChartInstance = echarts.init(typeChart.value)
   }
-  
-  // 直接使用攻击规则数据作为攻击类型分布
-  const typeData: Array<{ name: string; value: number }> = []
-  
-  if (stats.value.top_attack_rules && stats.value.top_attack_rules.length > 0) {
-    // 直接使用规则名称和对应的攻击次数
-    stats.value.top_attack_rules.forEach(rule => {
-      typeData.push({ 
-        name: rule.rule_name, 
-        value: rule.count 
-      })
-    })
-  } else {
-    // 如果没有数据，显示空状态
-    typeData.push({ name: '暂无数据', value: 1 })
-  }
-  
+
+  const typeData = stats.value.top_attack_rules.map(rule => ({
+    name: rule.rule_name,
+    value: rule.count
+  }))
+
   const option = {
     tooltip: {
       trigger: 'item',
@@ -596,159 +589,96 @@ const renderTypeChart = () => {
     legend: {
       orient: 'vertical',
       left: 'left',
-      textStyle: {
-        fontSize: 12
-      }
+      textStyle: { fontSize: 12 }
     },
-    series: [
-      {
-        name: '攻击类型',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['60%', '50%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 10,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false,
-          position: 'center'
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: '18',
-            fontWeight: 'bold'
-          }
-        },
-        labelLine: {
-          show: false
-        },
-        data: typeData
-      }
-    ]
+    series: [{
+      name: '攻击类型',
+      type: 'pie',
+      radius: ['40%', '70%'],
+      center: ['60%', '50%'],
+      data: typeData
+    }]
   }
-  
-  typeChartInstance.setOption(option)
+
+  typeChartInstance?.setOption(option)
 }
 
-const renderRealtimeChart = async () => {
-  if (!realtimeChart.value) return
-  
-  if (!realtimeChartInstance) {
-    realtimeChartInstance = echarts.init(realtimeChart.value)
-  }
-  
-  let realtimeData = []
-  
+const renderRealtimeChart = () => {}
+
+const updateTrendChart = async () => {
   try {
-    // 获取真实的实时攻击数据
-    const response = await getRealtimeStats()
-    realtimeData = response.data.map((item: { minute: string; count: number }) => ({
-      time: new Date(item.minute).toLocaleTimeString('zh-CN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }),
-      value: item.count
-    }))
-  } catch (error) {
-    console.error('获取实时数据失败:', error)
-    // 如果获取失败，使用空数据
-    const now = new Date()
-    for (let i = 59; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60000)
-      realtimeData.push({
-        time: time.toLocaleTimeString('zh-CN', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        value: 0
-      })
+    loading.value = true
+    // 根据选择的类型加载不同的数据
+    const response = await getAttackTrend(selectedDays.value, chartType.value as 'hourly' | 'daily')
+    
+    // 更新统计数据
+    if (chartType.value === 'hourly') {
+      stats.value.hourly_stats = response.data.map(item => ({
+        hour: item.time,
+        count: item.count
+      }))
+    } else {
+      stats.value.daily_stats = response.data
     }
+    
+    // 重新渲染图表
+    await nextTick()
+    renderTrendChart()
+  } catch (error) {
+    console.error('更新趋势图表失败:', error)
+    ElMessage.error('更新趋势图表失败，请稍后重试')
+  } finally {
+    loading.value = false
   }
-  
-  const option = {
-    tooltip: {
-      trigger: 'axis',
-      formatter: function(params: any) {
-        return `${params[0].name}<br/>攻击次数: ${params[0].value}`
-      }
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-              data: realtimeData.map((item: { time: string; value: number }) => item.time),
-      axisLabel: {
-        interval: 9 // 每10个点显示一个标签
-      }
-    },
-    yAxis: {
-      type: 'value'
-    },
-    series: [
-      {
-        name: '实时攻击',
-        type: 'bar',
-        barWidth: '60%',
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#f093fb' },
-            { offset: 1, color: '#f5576c' }
-          ])
-        },
-        data: realtimeData.map((item: { time: string; value: number }) => item.value)
-      }
-    ]
-  }
-  
-  realtimeChartInstance.setOption(option)
 }
 
-const updateTrendChart = () => {
-  renderTrendChart()
-}
+// 监听图表类型变化
+watch(chartType, () => {
+  updateTrendChart()
+})
+
+// 监听天数变化
+watch(selectedDays, () => {
+  updateTrendChart()
+})
 
 const refreshData = () => {
   loadStats()
 }
 
-const toggleAutoRefresh = () => {
-  autoRefresh.value = !autoRefresh.value
-  
-  if (autoRefresh.value) {
-    refreshInterval.value = setInterval(() => {
-      loadStats()
-      renderRealtimeChart() // 同时更新实时图表
-    }, 30000) // 30秒刷新一次
-    ElMessage.success('已开启自动刷新')
-  } else {
-    if (refreshInterval.value) {
-      clearInterval(refreshInterval.value)
-    }
-    ElMessage.info('已停止自动刷新')
+const updateCharts = async () => {
+  await nextTick()
+  renderCharts()
+}
+
+// 自动刷新数据
+const startAutoRefresh = () => {
+  if (refreshInterval.value) return
+  refreshInterval.value = setInterval(async () => {
+    await loadStats()
+  }, 30000) // 每30秒刷新一次
+}
+
+// 停止自动刷新
+const stopAutoRefresh = () => {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+    refreshInterval.value = undefined
   }
 }
 
-const exportData = async () => {
-  try {
-    await ElMessageBox.confirm('确定要导出当前统计报告吗？', '导出确认', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
-    
-    // 这里实现导出逻辑
-    ElMessage.success('报告导出成功')
-  } catch {
-    // 用户取消
+// 切换自动刷新状态
+const toggleAutoRefresh = () => {
+  autoRefresh.value = !autoRefresh.value
+  if (autoRefresh.value) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
   }
+}
+
+const exportData = () => {
+  ElMessage.info('导出功能开发中')
 }
 
 // 工具方法
@@ -825,9 +755,9 @@ const getRiskLevel = (count: number) => {
 
 // 已移除 getAttackTypeFromURI 函数，现在直接使用后端返回的 attack_type
 
-const addToBlacklist = async (ip: string) => {
+const addToBlacklist = async (clientIp: string) => {
   try {
-    await ElMessageBox.confirm(`确定要将IP ${ip} 加入黑名单吗？`, '确认操作', {
+    await ElMessageBox.confirm(`确定要将IP ${clientIp} 加入黑名单吗？`, '确认操作', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
@@ -836,16 +766,15 @@ const addToBlacklist = async (ip: string) => {
     // 调用API将IP加入黑名单
     await createBlackList({
       type: 'ip',
-      value: ip,
-      comment: `从攻击IP统计自动添加 - ${new Date().toLocaleString()}`,
-      enabled: true
+      value: clientIp,
+      comment: `从攻击IP统计自动添加 - ${new Date().toLocaleString()}`
     })
     
-    ElMessage.success(`IP ${ip} 已成功加入黑名单`)
+    ElMessage.success('已成功添加到黑名单')
+    await loadStats() // 重新加载数据
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('加入黑名单失败:', error)
-      ElMessage.error('加入黑名单失败，请稍后重试')
+      ElMessage.error('添加黑名单失败')
     }
   }
 }
@@ -871,11 +800,11 @@ const viewRuleDetail = async (ruleName: string) => {
   }
 }
 
-const showIPDetail = (ip: string) => {
-  const ipData = (stats.value.top_attack_ips || []).find(item => item.ip === ip)
+const showIPDetail = (clientIp: string) => {
+  const ipData = (stats.value.top_attack_ips || []).find(item => item.client_ip === clientIp)
   if (ipData) {
     ElMessageBox.alert(
-      `IP地址: ${ip}\n攻击次数: ${ipData.count}\n占比: ${getPercentage(ipData.count, stats.value.total_requests)}%`,
+      `IP地址: ${clientIp}\n攻击次数: ${ipData.count}\n占比: ${getPercentage(ipData.count, stats.value.total_requests)}%`,
       'IP详情',
       {
         confirmButtonText: '确定',
@@ -886,7 +815,7 @@ const showIPDetail = (ip: string) => {
 }
 
 const showURIDetail = (uri: string) => {
-  const uriData = (stats.value.top_attack_uris || []).find(item => item.uri === uri)
+  const uriData = (stats.value.top_attack_uris || []).find(item => item.request_uri === uri)
   if (uriData) {
     ElMessageBox.alert(
       `URI路径: ${uri}\n攻击次数: ${uriData.count}\n占比: ${getPercentage(uriData.count, stats.value.total_requests)}%`,
@@ -984,37 +913,40 @@ const addUserAgentToBlacklist = async (userAgent: string) => {
   }
 }
 
-// 生命周期
-onMounted(() => {
-  loadStats()
-  
-  // 监听窗口大小变化
-  window.addEventListener('resize', () => {
-    trendChartInstance?.resize()
-    typeChartInstance?.resize()
-    realtimeChartInstance?.resize()
-  })
+// 生命周期钩子
+onMounted(async () => {
+  await loadStats()
+  if (autoRefresh.value) {
+    startAutoRefresh()
+  }
 })
 
 onUnmounted(() => {
-  if (refreshInterval.value) {
-    clearInterval(refreshInterval.value)
+  stopAutoRefresh()
+  if (trendChartInstance) {
+    trendChartInstance.dispose()
+    trendChartInstance = null
   }
-  
-  // 销毁图表实例
-  trendChartInstance?.dispose()
-  typeChartInstance?.dispose()
-  realtimeChartInstance?.dispose()
-  
-  window.removeEventListener('resize', () => {})
+  if (typeChartInstance) {
+    typeChartInstance.dispose()
+    typeChartInstance = null
+  }
 })
 </script>
 
 <style scoped>
 .dashboard {
-  padding: 20px;
-  background: #f5f7fa;
-  min-height: calc(100vh - 60px);
+  height: 100%;
+  width: 100%;
+  padding: 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: #f5f7fa;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .dashboard-header {
@@ -1022,23 +954,26 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.header-left h2 {
-  margin: 0 0 8px 0;
-  color: #1f2937;
-  font-size: 24px;
-  font-weight: 600;
+.header-left {
+  h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .header-desc {
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 14px;
+  }
 }
 
-.header-desc {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
+.header-right {
+  display: flex;
+  gap: 12px;
 }
 
 .stats-row {
@@ -1046,79 +981,63 @@ onUnmounted(() => {
 }
 
 .stat-card {
+  display: flex;
+  align-items: center;
+  padding: 20px;
   background: white;
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  height: 100%;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-}
-
-.stat-card.total-requests::before {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.stat-card.blocked-requests::before {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.stat-card.allowed-requests::before {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.stat-card.active-rules::before {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-}
-
-.stat-card .stat-icon {
+.stat-icon {
   width: 48px;
   height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-right: 16px;
+  flex-shrink: 0;
+}
+
+.stat-icon .el-icon {
   font-size: 24px;
   color: white;
-  margin-bottom: 16px;
 }
 
 .total-requests .stat-icon {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
 }
 
 .blocked-requests .stat-icon {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(135deg, #f87171, #ef4444);
 }
 
 .allowed-requests .stat-icon {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(135deg, #34d399, #10b981);
 }
 
 .active-rules .stat-icon {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+}
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .stat-value {
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 600;
   color: #1f2937;
-  line-height: 1;
   margin-bottom: 8px;
 }
 
@@ -1197,12 +1116,10 @@ onUnmounted(() => {
   height: 200px;
 }
 
-
-
 .top-list {
   max-height: 400px;
   overflow-y: auto;
-  padding-right: 8px; /* 给滚动条留出空间 */
+  padding-right: 8px;
 }
 
 .top-item {
@@ -1276,7 +1193,7 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 600;
   margin-left: 12px;
-  margin-right: 8px; /* 与滚动条保持距离 */
+  margin-right: 8px;
   flex-shrink: 0;
 }
 
@@ -1352,6 +1269,180 @@ onUnmounted(() => {
   
   .chart-container {
     height: 250px;
+  }
+}
+
+.dashboard-container {
+  padding: 20px;
+}
+
+.overview-cards {
+  margin-bottom: 20px;
+}
+
+.overview-card {
+  height: 100%;
+  transition: all 0.3s;
+}
+
+.overview-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.header-desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.chart-container {
+  height: 300px;
+  width: 100%;
+}
+
+.rule-chart {
+  height: 300px;
+}
+
+.top-list-card {
+  height: 400px;  /* 设置固定高度 */
+  display: flex;
+  flex-direction: column;
+}
+
+.top-list-card :deep(.el-card__body) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.top-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.top-list::-webkit-scrollbar-thumb {
+  background-color: var(--el-border-color);
+  border-radius: 3px;
+}
+
+.top-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.top-item:hover {
+  background-color: var(--el-fill-color-light);
+}
+
+.rank {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.rank-1 {
+  background-color: #f56c6c;
+  color: white;
+}
+
+.rank-2 {
+  background-color: #e6a23c;
+  color: white;
+}
+
+.rank-3 {
+  background-color: #67c23a;
+  color: white;
+}
+
+.rank-other {
+  background-color: var(--el-fill-color);
+  color: var(--el-text-color-regular);
+}
+
+.item-content {
+  flex: 1;
+  min-width: 0;
+  margin-right: 12px;
+}
+
+.item-value {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-progress {
+  width: 100%;
+}
+
+.item-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rule-charts {
+  margin-bottom: 20px;
+}
+
+.attack-stats {
+  margin-bottom: 20px;
+}
+
+/* 添加响应式布局调整 */
+@media screen and (max-width: 768px) {
+  .top-list-card {
+    height: 350px;  /* 在移动端稍微降低高度 */
+  }
+  
+  .chart-container,
+  .rule-chart {
+    height: 250px;  /* 在移动端降低图表高度 */
   }
 }
 </style> 

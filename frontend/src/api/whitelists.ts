@@ -22,7 +22,7 @@ export interface WhiteListListResponse {
 // 创建白名单
 export function createWhiteList(data: Omit<WhiteList, 'id' | 'created_at' | 'updated_at'>) {
   return request({
-    url: '/whitelists',
+    url: '/api/v1/whitelists',
     method: 'post',
     data
   })
@@ -37,7 +37,7 @@ export function getWhiteListList(params: {
   enabled?: boolean
 }) {
   return request({
-    url: '/whitelists',
+    url: '/api/v1/whitelists',
     method: 'get',
     params
   })
@@ -46,7 +46,7 @@ export function getWhiteListList(params: {
 // 获取白名单详情
 export function getWhiteListById(id: number) {
   return request({
-    url: `/whitelists/${id}`,
+    url: `/api/v1/whitelists/${id}`,
     method: 'get'
   })
 }
@@ -54,7 +54,7 @@ export function getWhiteListById(id: number) {
 // 更新白名单
 export function updateWhiteList(id: number, data: Partial<WhiteList>) {
   return request({
-    url: `/whitelists/${id}`,
+    url: `/api/v1/whitelists/${id}`,
     method: 'put',
     data
   })
@@ -63,7 +63,7 @@ export function updateWhiteList(id: number, data: Partial<WhiteList>) {
 // 删除白名单
 export function deleteWhiteList(id: number) {
   return request({
-    url: `/whitelists/${id}`,
+    url: `/api/v1/whitelists/${id}`,
     method: 'delete'
   })
 }
@@ -71,7 +71,7 @@ export function deleteWhiteList(id: number) {
 // 批量删除白名单
 export function batchDeleteWhiteList(ids: number[]) {
   return request({
-    url: '/whitelists/batch',
+    url: '/api/v1/whitelists/batch',
     method: 'delete',
     data: ids
   })
@@ -80,7 +80,7 @@ export function batchDeleteWhiteList(ids: number[]) {
 // 切换白名单状态
 export function toggleWhiteListStatus(id: number) {
   return request({
-    url: `/whitelists/${id}/toggle`,
+    url: `/api/v1/whitelists/${id}/toggle`,
     method: 'patch'
   })
 } 

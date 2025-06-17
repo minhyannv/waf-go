@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"waf-go/internal/config"
 
 	"github.com/go-redis/redis/v8"
@@ -52,92 +51,38 @@ func NewConfigService(db *gorm.DB, redis *redis.Client, cfg *config.Config) *Con
 
 // GetSystemConfig 获取系统配置
 func (s *ConfigService) GetSystemConfig() (*SystemConfig, error) {
-	// 从当前配置获取默认值
-	systemConfig := &SystemConfig{
+	return &SystemConfig{
 		WAF: WAFConfig{
 			RateLimitWindow: s.config.WAF.RateLimitWindow,
 			MaxRequests:     s.config.WAF.MaxRequests,
-			EnableRateLimit: true,
-			EnableBlacklist: true,
-			EnableWhitelist: true,
+			EnableRateLimit: s.config.WAF.EnableRateLimit,
+			EnableBlacklist: s.config.WAF.EnableBlacklist,
+			EnableWhitelist: s.config.WAF.EnableWhitelist,
 		},
 		Server: ServerConfig{
 			Mode: s.config.Server.Mode,
 		},
 		Log: LogConfig{
-			Level: s.config.Log.Level,
+			Level: "info",
 		},
-	}
-
-	// 尝试从Redis获取运行时配置
-	configData, err := s.redis.Get(s.redis.Context(), "system:config").Result()
-	if err == nil {
-		var runtimeConfig SystemConfig
-		if json.Unmarshal([]byte(configData), &runtimeConfig) == nil {
-			// 合并运行时配置
-			if runtimeConfig.WAF.RateLimitWindow > 0 {
-				systemConfig.WAF.RateLimitWindow = runtimeConfig.WAF.RateLimitWindow
-			}
-			if runtimeConfig.WAF.MaxRequests > 0 {
-				systemConfig.WAF.MaxRequests = runtimeConfig.WAF.MaxRequests
-			}
-			systemConfig.WAF.EnableRateLimit = runtimeConfig.WAF.EnableRateLimit
-			systemConfig.WAF.EnableBlacklist = runtimeConfig.WAF.EnableBlacklist
-			systemConfig.WAF.EnableWhitelist = runtimeConfig.WAF.EnableWhitelist
-
-			if runtimeConfig.Server.Mode != "" {
-				systemConfig.Server.Mode = runtimeConfig.Server.Mode
-			}
-			if runtimeConfig.Log.Level != "" {
-				systemConfig.Log.Level = runtimeConfig.Log.Level
-			}
-		}
-	}
-
-	return systemConfig, nil
+	}, nil
 }
 
 // UpdateSystemConfig 更新系统配置
 func (s *ConfigService) UpdateSystemConfig(req *UpdateConfigRequest) (*SystemConfig, error) {
-	// 获取当前配置
-	currentConfig, err := s.GetSystemConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// 更新配置
 	if req.WAF != nil {
-		if req.WAF.RateLimitWindow > 0 {
-			currentConfig.WAF.RateLimitWindow = req.WAF.RateLimitWindow
-		}
-		if req.WAF.MaxRequests > 0 {
-			currentConfig.WAF.MaxRequests = req.WAF.MaxRequests
-		}
-		currentConfig.WAF.EnableRateLimit = req.WAF.EnableRateLimit
-		currentConfig.WAF.EnableBlacklist = req.WAF.EnableBlacklist
-		currentConfig.WAF.EnableWhitelist = req.WAF.EnableWhitelist
+		s.config.WAF.RateLimitWindow = req.WAF.RateLimitWindow
+		s.config.WAF.MaxRequests = req.WAF.MaxRequests
+		s.config.WAF.EnableRateLimit = req.WAF.EnableRateLimit
+		s.config.WAF.EnableBlacklist = req.WAF.EnableBlacklist
+		s.config.WAF.EnableWhitelist = req.WAF.EnableWhitelist
 	}
 
-	if req.Server != nil && req.Server.Mode != "" {
-		currentConfig.Server.Mode = req.Server.Mode
+	if req.Server != nil {
+		s.config.Server.Mode = req.Server.Mode
 	}
 
-	if req.Log != nil && req.Log.Level != "" {
-		currentConfig.Log.Level = req.Log.Level
-	}
-
-	// 保存到Redis
-	configData, err := json.Marshal(currentConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.redis.Set(s.redis.Context(), "system:config", configData, 0).Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return currentConfig, nil
+	return s.GetSystemConfig()
 }
 
 // ResetSystemConfig 重置系统配置为默认值

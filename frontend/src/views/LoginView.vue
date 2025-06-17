@@ -105,19 +105,20 @@ const handleLogin = async () => {
 }
 </script>
 
-<style scoped>
+<style>
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  width: 100vw;
-  position: fixed;
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 1000;
 }
 
 .login-box {

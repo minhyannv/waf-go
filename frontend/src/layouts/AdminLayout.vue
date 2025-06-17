@@ -35,6 +35,11 @@
           <span>策略管理</span>
         </el-menu-item>
         
+        <el-menu-item index="/domains">
+          <el-icon><Connection /></el-icon>
+          <span>域名管理</span>
+        </el-menu-item>
+        
         <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
           <span>系统设置</span>
@@ -85,7 +90,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Monitor, Lock, Document, Files, Setting, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
+import { Monitor, Lock, Document, Files, Setting, Connection, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -100,6 +105,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/rules')) return '/rules'
   if (path.startsWith('/logs')) return '/logs'
   if (path.startsWith('/policies')) return '/policies'
+  if (path.startsWith('/domains')) return '/domains'
   if (path.startsWith('/settings')) return '/settings'
   return '/dashboard'
 })
@@ -162,8 +168,9 @@ onMounted(() => {
   background-color: #304156;
   transition: width 0.3s;
   flex-shrink: 0;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
+  z-index: 10;
 }
 
 .logo {
@@ -186,8 +193,9 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
+  background-color: #f5f7fa;
 }
 
 .header {
@@ -199,6 +207,7 @@ onMounted(() => {
   justify-content: space-between;
   padding: 0 20px;
   flex-shrink: 0;
+  z-index: 9;
 }
 
 .header-left {
@@ -231,9 +240,9 @@ onMounted(() => {
 
 .main-content {
   flex: 1;
-  background: #f5f5f5;
-  padding: 20px;
-  overflow-y: auto;
+  overflow: auto;
+  position: relative;
   height: calc(100vh - 60px);
+  background-color: #f5f7fa;
 }
 </style> 

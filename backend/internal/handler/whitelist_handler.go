@@ -41,7 +41,7 @@ func (h *WhiteListHandler) CreateWhiteList(c *gin.Context) {
 	// 从JWT获取租户ID
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			req.TenantID = userClaims.TenantID
 		}
 	}
@@ -79,7 +79,7 @@ func (h *WhiteListHandler) GetWhiteListList(c *gin.Context) {
 	// 从JWT获取租户ID
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			req.TenantID = userClaims.TenantID
 		}
 	}
@@ -116,7 +116,7 @@ func (h *WhiteListHandler) GetWhiteListByID(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -160,7 +160,7 @@ func (h *WhiteListHandler) UpdateWhiteList(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -197,7 +197,7 @@ func (h *WhiteListHandler) DeleteWhiteList(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -236,7 +236,7 @@ func (h *WhiteListHandler) BatchDeleteWhiteList(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}
@@ -272,7 +272,7 @@ func (h *WhiteListHandler) ToggleWhiteListStatus(c *gin.Context) {
 	var tenantID uint
 	claims, exists := c.Get("claims")
 	if exists {
-		if userClaims, ok := claims.(*utils.Claims); ok {
+		if userClaims, ok := claims.(*service.JWTClaims); ok {
 			tenantID = userClaims.TenantID
 		}
 	}

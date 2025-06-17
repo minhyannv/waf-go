@@ -5,6 +5,7 @@ services:
   mysql:
     image: mysql:8.0
     container_name: waf-mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --init-connect='SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci' --character-set-client-handshake=FALSE
     environment:
       MYSQL_ROOT_PASSWORD: waf123456
       MYSQL_DATABASE: waf
@@ -32,47 +33,6 @@ services:
     volumes:
       - redis_data:/data
       - /etc/localtime:/etc/localtime:ro
-    networks:
-      - waf-network
-    restart: unless-stopped
-
-  # WAF 后端服务
-  waf-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: waf-backend
-    ports:
-      - "8081:8080"
-    environment:
-      - DATABASE_DSN=waf:waf123456@tcp(mysql:3306)/waf?charset=utf8mb4&parseTime=True&loc=Local
-      - REDIS_ADDR=redis:6379
-      - JWT_SECRET=waf-production-secret-key-change-me
-      - TZ=Asia/Shanghai
-    depends_on:
-      - mysql
-      - redis
-    networks:
-      - waf-network
-    restart: unless-stopped
-    volumes:
-      - ./backend/config:/app/config
-      - /etc/localtime:/etc/localtime:ro
-
-  # WAF 前端服务
-  waf-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: waf-frontend
-    environment:
-      - TZ=Asia/Shanghai
-    ports:
-      - "80:80"
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-    depends_on:
-      - waf-backend
     networks:
       - waf-network
     restart: unless-stopped

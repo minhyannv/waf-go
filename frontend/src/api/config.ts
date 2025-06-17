@@ -32,7 +32,7 @@ export interface UpdateConfigRequest {
 // 获取系统配置
 export function getSystemConfig() {
   return request({
-    url: '/config',
+    url: '/api/v1/config',
     method: 'get'
   })
 }
@@ -40,7 +40,7 @@ export function getSystemConfig() {
 // 更新系统配置
 export function updateSystemConfig(data: UpdateConfigRequest) {
   return request({
-    url: '/config',
+    url: '/api/v1/config',
     method: 'put',
     data
   })
@@ -49,7 +49,7 @@ export function updateSystemConfig(data: UpdateConfigRequest) {
 // 重置系统配置
 export function resetSystemConfig() {
   return request({
-    url: '/config/reset',
+    url: '/api/v1/config/reset',
     method: 'post'
   })
 }
@@ -57,7 +57,7 @@ export function resetSystemConfig() {
 // 获取配置统计信息
 export function getConfigStats() {
   return request({
-    url: '/config/stats',
+    url: '/api/v1/config/stats',
     method: 'get'
   })
 } 

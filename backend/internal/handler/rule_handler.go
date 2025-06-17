@@ -9,6 +9,7 @@ import (
 
 	"waf-go/internal/logger"
 	"waf-go/internal/service"
+	"waf-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -134,6 +135,8 @@ func (h *RuleHandler) GetRuleList(c *gin.Context) {
 		zap.Int("page", req.Page),
 		zap.Int("page_size", req.PageSize),
 		zap.String("name", req.Name),
+		zap.String("match_type", req.MatchType),
+		zap.Bool("enabled", req.Enabled != nil && *req.Enabled),
 		zap.String("role", role),
 		zap.Uint("tenant_id", req.TenantID),
 	)
@@ -189,7 +192,7 @@ func (h *RuleHandler) GetRule(c *gin.Context) {
 		return
 	}
 
-	rule, err := h.ruleService.GetRuleByID(uint(id))
+	rule, err := h.ruleService.GetRule(uint(id))
 	if err != nil {
 		logger.Error("GetRule - 服务层错误",
 			zap.Error(err),
@@ -348,4 +351,20 @@ func (h *RuleHandler) ToggleRule(c *gin.Context) {
 		"message": "操作成功",
 		"data":    nil,
 	})
+}
+
+// BatchDeleteRules 批量删除规则
+func (h *RuleHandler) BatchDeleteRules(c *gin.Context) {
+	var ids []uint
+	if err := c.ShouldBindJSON(&ids); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "无效的请求参数")
+		return
+	}
+
+	if err := h.ruleService.BatchDeleteRules(ids); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "删除规则失败: "+err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "规则删除成功", nil)
 }

@@ -47,23 +47,23 @@ export interface LogListResponse {
 }
 
 // 获取攻击日志列表
-export const getAttackLogList = (params: LogListParams) => {
-  return request.get<LogListResponse>('/logs/attacks', { params })
+export function getAttackLogs(params: AttackLogListParams) {
+  return request.get<AttackLogListResponse>('/api/v1/logs/attacks', { params })
 }
 
 // 获取攻击日志详情
-export const getAttackLogDetail = (id: number) => {
-  return request.get<AttackLog>(`/logs/attacks/${id}`)
+export function getAttackLogDetail(id: number) {
+  return request.get<AttackLog>(`/api/v1/logs/attacks/${id}`)
 }
 
 // 删除攻击日志
-export const deleteAttackLog = (id: number) => {
-  return request.delete(`/logs/attacks/${id}`)
+export function deleteAttackLog(id: number) {
+  return request.delete(`/api/v1/logs/attacks/${id}`)
 }
 
 // 批量删除攻击日志
-export const batchDeleteAttackLogs = (ids: number[]) => {
-  return request.delete('/logs/attacks/batch', { data: { ids } })
+export function batchDeleteAttackLogs(ids: number[]) {
+  return request.delete('/api/v1/logs/attacks/batch', { data: { ids } })
 }
 
 // 清理旧日志
@@ -82,4 +82,24 @@ export const exportAttackLogs = (ids?: number[]) => {
     params,
     responseType: 'blob'
   })
+}
+
+// 获取实时日志列表
+export function getRealtimeLogs(params: RealtimeLogListParams) {
+  return request.get<RealtimeLogListResponse>('/api/v1/logs/realtime', { params })
+}
+
+// 获取实时日志详情
+export function getRealtimeLogDetail(id: number) {
+  return request.get<RealtimeLog>(`/api/v1/logs/realtime/${id}`)
+}
+
+// 删除实时日志
+export function deleteRealtimeLog(id: number) {
+  return request.delete(`/api/v1/logs/realtime/${id}`)
+}
+
+// 批量删除实时日志
+export function batchDeleteRealtimeLogs(ids: number[]) {
+  return request.delete('/api/v1/logs/realtime/batch', { data: { ids } })
 } 

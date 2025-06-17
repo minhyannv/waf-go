@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"waf-go/internal/service"
 	"waf-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -75,5 +76,27 @@ func RequireRole(requiredRoles ...string) gin.HandlerFunc {
 			"message": "权限不足",
 		})
 		c.Abort()
+	}
+}
+
+// GetUserContext 从Gin上下文获取用户信息
+func GetUserContext(c *gin.Context) *service.UserContext {
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+	role, _ := c.Get("role")
+	tenantID, _ := c.Get("tenant_id")
+	tenantCode, exists := c.Get("tenant_code")
+
+	var tenantCodeStr string
+	if exists && tenantCode != nil {
+		tenantCodeStr = tenantCode.(string)
+	}
+
+	return &service.UserContext{
+		UserID:     userID.(uint),
+		Username:   username.(string),
+		Role:       role.(string),
+		TenantID:   tenantID.(uint),
+		TenantCode: tenantCodeStr,
 	}
 }
