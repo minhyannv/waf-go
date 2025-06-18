@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -65,7 +66,7 @@ func main() {
 	// 优雅关闭
 	go func() {
 		log.Printf("HTTP服务器启动在端口 %d", cfg.Server.HTTPPort)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("启动服务器失败: %v", err)
 		}
 	}()

@@ -15,7 +15,6 @@ import (
 	"waf-go/internal/proxy"
 	"waf-go/internal/router"
 	"waf-go/internal/service"
-	"waf-go/internal/waf"
 )
 
 func main() {
@@ -31,29 +30,14 @@ func main() {
 	// 创建代理管理器
 	proxyManager := proxy.NewProxyManager()
 
-	// 创建WAF引擎
-	wafEngine := waf.NewWAFEngine(database, redisClient)
-
 	// 创建服务
-	services := &service.Services{
-		Auth:      service.NewAuthService(database),
-		Rule:      service.NewRuleService(database, wafEngine),
-		Policy:    service.NewPolicyService(database),
-		Log:       service.NewLogService(database),
-		Dashboard: service.NewDashboardService(database),
-		WhiteList: service.NewWhiteListService(database),
-		BlackList: service.NewBlackListService(database),
-		Config:    service.NewConfigService(database, redisClient, cfg),
-		Domain:    service.NewDomainService(database, proxyManager),
-		WAFEngine: wafEngine,
-		ProxyMgr:  proxyManager,
-	}
+	services := service.NewServices(database, redisClient)
 
 	// 初始化路由
 	r := router.Init(services)
 
 	// 加载所有启用的域名到代理管理器
-	if err := services.Domain.LoadAllDomains(); err != nil {
+	if err := services.GetDomainService().LoadAllDomains(); err != nil {
 		log.Printf("加载域名配置失败: %v", err)
 	}
 

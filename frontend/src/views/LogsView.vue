@@ -44,6 +44,14 @@
               style="width: 160px"
             />
           </el-form-item>
+          <el-form-item label="域名">
+            <el-input
+              v-model="searchForm.domain"
+              placeholder="请输入域名"
+              clearable
+              style="width: 200px"
+            />
+          </el-form-item>
           <el-form-item label="动作">
             <el-select v-model="searchForm.action" placeholder="请选择动作" clearable style="width: 120px">
               <el-option label="拦截" value="block" />
@@ -101,6 +109,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="request_uri" label="请求URI" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="domain" label="域名" width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-tag v-if="row.domain" type="primary" size="small">{{ row.domain }}</el-tag>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="rule_name" label="触发规则" width="150" show-overflow-tooltip />
         <el-table-column prop="action" label="动作" width="80">
           <template #default="{ row }">
@@ -157,6 +171,10 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="请求URI" :span="2">{{ currentLog?.request_uri }}</el-descriptions-item>
+        <el-descriptions-item label="域名">
+          <el-tag v-if="currentLog?.domain" type="primary">{{ currentLog.domain }}</el-tag>
+          <span v-else class="text-gray">-</span>
+        </el-descriptions-item>
         <el-descriptions-item label="User-Agent" :span="2">{{ currentLog?.user_agent || '无' }}</el-descriptions-item>
         <el-descriptions-item label="触发规则">{{ currentLog.rule_name }}</el-descriptions-item>
         <el-descriptions-item label="匹配字段">{{ currentLog.match_field }}</el-descriptions-item>
@@ -229,7 +247,7 @@ import { ref, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Download, Delete } from '@element-plus/icons-vue'
 import { 
-  getAttackLogList, 
+  getAttackLogs, 
   getAttackLogDetail, 
   deleteAttackLog, 
   batchDeleteAttackLogs,
@@ -314,7 +332,7 @@ const formatDate = (dateStr?: string) => {
 const loadLogs = async () => {
   loading.value = true
   try {
-    const response = await getAttackLogList({
+    const response = await getAttackLogs({
       page: pagination.page,
       page_size: pagination.pageSize,
       ...searchForm
@@ -345,6 +363,7 @@ const resetSearch = () => {
     client_ip: '',
     request_uri: '',
     rule_name: '',
+    domain: '',
     action: '',
     start_time: '',
     end_time: ''
@@ -449,6 +468,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.logs-view {
+  padding: 20px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -462,27 +485,30 @@ onMounted(() => {
 
 .search-area {
   margin-bottom: 20px;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 6px;
 }
 
 .batch-actions {
   margin-bottom: 15px;
-  padding: 10px 15px;
-  background: #e3f2fd;
+  padding: 10px;
+  background-color: #f5f7fa;
   border-radius: 4px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 10px;
 }
 
 .pagination {
   margin-top: 20px;
-  text-align: right;
+  display: flex;
+  justify-content: center;
 }
 
 .form-tip {
   margin-top: 5px;
+}
+
+.text-gray {
+  color: #909399;
+  font-style: italic;
 }
 </style> 

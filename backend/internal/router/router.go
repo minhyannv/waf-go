@@ -218,17 +218,28 @@ func Init(services *service.Services) *gin.Engine {
 			c.Next()
 			return
 		}
-		wafMiddleware(services)(c)
-		if !c.IsAborted() {
-			proxy := services.GetDomainService().GetProxyManager().GetProxy(c.Request.Host)
-			if proxy == nil {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error": fmt.Sprintf("Domain not found: %s", c.Request.Host),
-				})
-				return
-			}
-			proxy.ServeHTTP(c.Writer, c.Request)
+
+		// 先检查域名是否存在
+		proxy := services.GetDomainService().GetProxyManager().GetProxy(c.Request.Host)
+		if proxy == nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("Domain not found: %s", c.Request.Host),
+			})
+			return
 		}
+
+		// 检查域名是否关联了策略（即是否接入WAF）
+		hasPolicies := services.GetDomainService().HasDomainPolicies(c.Request.Host)
+		if hasPolicies {
+			// 域名关联了策略，需要经过WAF检查
+			wafMiddleware(services)(c)
+			if c.IsAborted() {
+				return // WAF拦截了请求
+			}
+		}
+
+		// 转发到后端服务
+		proxy.ServeHTTP(c.Writer, c.Request)
 	})
 
 	return r

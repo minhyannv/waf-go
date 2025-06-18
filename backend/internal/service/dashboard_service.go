@@ -490,31 +490,55 @@ func (s *DashboardService) GetAttackTrend(tenantID uint, timeType string, days i
 	var query string
 
 	if timeType == "hourly" {
-		// 按小时统计
+		// 按小时统计 - 返回完整的24小时数据
 		query = `
-			SELECT DATE_FORMAT(al.created_at, '%Y-%m-%d %H:00:00') as time, COUNT(*) as count
-			FROM attack_logs al
-			JOIN domains d ON al.domain_id = d.id
-			WHERE d.tenant_id = ?
-			AND al.created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-			GROUP BY DATE_FORMAT(al.created_at, '%Y-%m-%d %H:00:00')
-			ORDER BY time ASC
+			WITH RECURSIVE hours AS (
+				SELECT DATE_FORMAT(DATE_SUB(NOW(), INTERVAL ? HOUR), '%Y-%m-%d %H:00:00') as hour
+				UNION ALL
+				SELECT DATE_FORMAT(DATE_ADD(STR_TO_DATE(hour, '%Y-%m-%d %H:%i:%s'), INTERVAL 1 HOUR), '%Y-%m-%d %H:00:00')
+				FROM hours
+				WHERE hour < DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00')
+			),
+			attack_stats AS (
+				SELECT DATE_FORMAT(al.created_at, '%Y-%m-%d %H:00:00') as time, COUNT(*) as count
+				FROM attack_logs al
+				JOIN domains d ON al.domain_id = d.id
+				WHERE d.tenant_id = ?
+				AND al.created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+				GROUP BY DATE_FORMAT(al.created_at, '%Y-%m-%d %H:00:00')
+			)
+			SELECT h.hour as time, COALESCE(a.count, 0) as count
+			FROM hours h
+			LEFT JOIN attack_stats a ON h.hour = a.time
+			ORDER BY h.hour ASC
 		`
-		if err := s.db.Raw(query, tenantID, days*24).Scan(&trends).Error; err != nil {
+		if err := s.db.Raw(query, days*24, tenantID, days*24).Scan(&trends).Error; err != nil {
 			return nil, err
 		}
 	} else {
-		// 按天统计
+		// 按天统计 - 返回完整的天数据
 		query = `
-			SELECT DATE(al.created_at) as time, COUNT(*) as count
-			FROM attack_logs al
-			JOIN domains d ON al.domain_id = d.id
-			WHERE d.tenant_id = ?
-			AND al.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-			GROUP BY DATE(al.created_at)
-			ORDER BY time ASC
+			WITH RECURSIVE dates AS (
+				SELECT DATE(DATE_SUB(CURDATE(), INTERVAL ? DAY)) as date
+				UNION ALL
+				SELECT DATE_ADD(date, INTERVAL 1 DAY)
+				FROM dates
+				WHERE date < CURDATE()
+			),
+			attack_stats AS (
+				SELECT DATE(al.created_at) as time, COUNT(*) as count
+				FROM attack_logs al
+				JOIN domains d ON al.domain_id = d.id
+				WHERE d.tenant_id = ?
+				AND al.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+				GROUP BY DATE(al.created_at)
+			)
+			SELECT d.date as time, COALESCE(a.count, 0) as count
+			FROM dates d
+			LEFT JOIN attack_stats a ON d.date = a.time
+			ORDER BY d.date ASC
 		`
-		if err := s.db.Raw(query, tenantID, days).Scan(&trends).Error; err != nil {
+		if err := s.db.Raw(query, days, tenantID, days).Scan(&trends).Error; err != nil {
 			return nil, err
 		}
 	}

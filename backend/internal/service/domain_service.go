@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"waf-go/internal/models"
@@ -91,7 +92,7 @@ func (s *DomainService) CreateDomain(req *CreateDomainRequest) (*models.Domain, 
 	if err == nil {
 		return nil, fmt.Errorf("域名 %s 已存在", req.Domain)
 	}
-	if err != gorm.ErrRecordNotFound {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("检查域名失败: %v", err)
 	}
 
@@ -454,4 +455,29 @@ func (s *DomainService) LoadAllDomains() error {
 // GetProxyManager 获取代理管理器
 func (s *DomainService) GetProxyManager() *proxy.ProxyManager {
 	return s.proxyManager
+}
+
+// GetDomainConfig 根据域名获取配置信息
+func (s *DomainService) GetDomainConfig(domain string) *models.Domain {
+	return s.proxyManager.GetDomainConfig(domain)
+}
+
+// HasDomainPolicies 检查域名是否关联了策略
+func (s *DomainService) HasDomainPolicies(domain string) bool {
+	domainConfig := s.GetDomainConfig(domain)
+	if domainConfig == nil {
+		return false
+	}
+
+	// 查询域名是否关联了策略
+	var count int64
+	err := s.db.Model(&models.DomainPolicy{}).
+		Where("domain_id = ? AND enabled = ?", domainConfig.ID, true).
+		Count(&count).Error
+
+	if err != nil {
+		return false
+	}
+
+	return count > 0
 }

@@ -18,6 +18,7 @@ type LogListRequest struct {
 	ClientIP   string    `form:"client_ip"`
 	RequestURI string    `form:"request_uri"`
 	RuleName   string    `form:"rule_name"`
+	Domain     string    `form:"domain"`
 	Action     string    `form:"action"`
 	TenantID   uint      `form:"tenant_id"`
 	StartTime  time.Time `form:"start_time"`
@@ -44,6 +45,9 @@ func (s *LogService) GetAttackLogList(req *LogListRequest) ([]models.AttackLog, 
 	}
 	if req.RuleName != "" {
 		query = query.Where("rule_name LIKE ?", "%"+req.RuleName+"%")
+	}
+	if req.Domain != "" {
+		query = query.Where("domain LIKE ?", "%"+req.Domain+"%")
 	}
 	if req.Action != "" {
 		query = query.Where("action = ?", req.Action)

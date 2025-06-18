@@ -51,7 +51,7 @@ func (pm *ProxyManager) UpdateDomain(domain *models.Domain) error {
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		pm.modifyRequest(req, target, domain)
+		pm.modifyRequest(req, target)
 	}
 
 	// 自定义错误处理
@@ -123,8 +123,18 @@ func (pm *ProxyManager) GetTLSConfig(domain string) *tls.Config {
 	return pm.tlsConfig[domain]
 }
 
+// GetDomainConfig 获取域名配置信息
+func (pm *ProxyManager) GetDomainConfig(domain string) *models.Domain {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	if domainConfig, exists := pm.domains[domain]; exists {
+		return domainConfig
+	}
+	return nil
+}
+
 // modifyRequest 修改请求
-func (pm *ProxyManager) modifyRequest(req *http.Request, target *url.URL, domain *models.Domain) {
+func (pm *ProxyManager) modifyRequest(req *http.Request, target *url.URL) {
 	req.URL.Scheme = target.Scheme
 	req.URL.Host = target.Host
 	req.Host = target.Host
