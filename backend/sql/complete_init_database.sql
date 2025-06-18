@@ -169,69 +169,41 @@ CREATE TABLE `white_lists` (
   CONSTRAINT `fk_white_lists_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='白名单表';
 
--- 域名策略关联表
-CREATE TABLE `domain_policies` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `domain_id` bigint unsigned NOT NULL COMMENT '域名ID',
-  `policy_id` bigint unsigned NOT NULL COMMENT '策略ID',
-  `priority` int NOT NULL DEFAULT '1' COMMENT '优先级',
-  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_domain_policy` (`domain_id`,`policy_id`),
-  KEY `idx_enabled` (`enabled`),
-  CONSTRAINT `fk_domain_policies_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_domain_policies_policy` FOREIGN KEY (`policy_id`) REFERENCES `policies` (`id`) ON DELETE CASCADE
+-- 域名策略关联表 - 域名(Domain) ↔ 策略(Policy): 多对多
+CREATE TABLE IF NOT EXISTS `domain_policies` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '关联ID，主键',
+    `domain_id` bigint unsigned NOT NULL COMMENT '域名ID',
+    `policy_id` bigint unsigned NOT NULL COMMENT '策略ID',
+    `priority` int NOT NULL DEFAULT '1' COMMENT '策略在该域名下的优先级，数字越大优先级越高',
+    `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用此关联',
+    `created_at` timestamp NULL DEFAULT NULL COMMENT '创建时间',
+    `updated_at` timestamp NULL DEFAULT NULL COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_domain_policy` (`domain_id`,`policy_id`),
+    KEY `idx_domain_policies_enabled` (`enabled`),
+    KEY `fk_domain_policies_domain_id` (`domain_id`),
+    KEY `fk_domain_policies_policy_id` (`policy_id`),
+    CONSTRAINT `fk_domain_policies_domain_id` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_domain_policies_policy_id` FOREIGN KEY (`policy_id`) REFERENCES `policies` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='域名策略关联表';
 
--- 策略规则关联表
-CREATE TABLE `policy_rules` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `policy_id` bigint unsigned NOT NULL COMMENT '策略ID',
-  `rule_id` bigint unsigned NOT NULL COMMENT '规则ID',
-  `priority` int NOT NULL DEFAULT '1' COMMENT '优先级',
-  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_policy_rule` (`policy_id`,`rule_id`),
-  KEY `idx_enabled` (`enabled`),
-  CONSTRAINT `fk_policy_rules_policy` FOREIGN KEY (`policy_id`) REFERENCES `policies` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_policy_rules_rule` FOREIGN KEY (`rule_id`) REFERENCES `rules` (`id`) ON DELETE CASCADE
+-- 策略规则关联表 - 策略(Policy) ↔ 规则(Rule): 多对多
+CREATE TABLE IF NOT EXISTS `policy_rules` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '关联ID，主键',
+    `policy_id` bigint unsigned NOT NULL COMMENT '策略ID',
+    `rule_id` bigint unsigned NOT NULL COMMENT '规则ID',
+    `priority` int NOT NULL DEFAULT '1' COMMENT '规则在该策略下的优先级，数字越大优先级越高',
+    `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用此关联',
+    `created_at` timestamp NULL DEFAULT NULL COMMENT '创建时间',
+    `updated_at` timestamp NULL DEFAULT NULL COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_policy_rule` (`policy_id`,`rule_id`),
+    KEY `idx_policy_rules_enabled` (`enabled`),
+    KEY `fk_policy_rules_policy_id` (`policy_id`),
+    KEY `fk_policy_rules_rule_id` (`rule_id`),
+    CONSTRAINT `fk_policy_rules_policy_id` FOREIGN KEY (`policy_id`) REFERENCES `policies` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_policy_rules_rule_id` FOREIGN KEY (`rule_id`) REFERENCES `rules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='策略规则关联表';
-
--- 域名黑名单关联表
-CREATE TABLE `domain_black_lists` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `domain_id` bigint unsigned NOT NULL COMMENT '域名ID',
-  `black_list_id` bigint unsigned NOT NULL COMMENT '黑名单ID',
-  `priority` int NOT NULL DEFAULT '1' COMMENT '优先级',
-  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_domain_blacklist` (`domain_id`,`black_list_id`),
-  KEY `idx_enabled` (`enabled`),
-  CONSTRAINT `fk_domain_black_lists_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_domain_black_lists_blacklist` FOREIGN KEY (`black_list_id`) REFERENCES `black_lists` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='域名黑名单关联表';
-
--- 域名白名单关联表
-CREATE TABLE `domain_white_lists` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `domain_id` bigint unsigned NOT NULL COMMENT '域名ID',
-  `white_list_id` bigint unsigned NOT NULL COMMENT '白名单ID',
-  `priority` int NOT NULL DEFAULT '1' COMMENT '优先级',
-  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_domain_whitelist` (`domain_id`,`white_list_id`),
-  KEY `idx_enabled` (`enabled`),
-  CONSTRAINT `fk_domain_white_lists_domain` FOREIGN KEY (`domain_id`) REFERENCES `domains` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_domain_white_lists_whitelist` FOREIGN KEY (`white_list_id`) REFERENCES `white_lists` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='域名白名单关联表';
 
 -- 攻击日志表
 CREATE TABLE `attack_logs` (

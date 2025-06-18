@@ -1,170 +1,142 @@
 package service
 
 import (
+	"errors"
+
 	"waf-go/internal/models"
 
 	"gorm.io/gorm"
 )
 
+// BlackListService 黑名单服务
 type BlackListService struct {
 	db *gorm.DB
 }
 
-type CreateBlackListRequest struct {
-	Type     string `json:"type" binding:"required,oneof=ip uri user_agent"`
-	Value    string `json:"value" binding:"required"`
-	Comment  string `json:"comment"`
-	Enabled  bool   `json:"enabled"`
-	TenantID uint   `json:"tenant_id"`
-}
-
-type UpdateBlackListRequest struct {
-	Type    string `json:"type" binding:"oneof=ip uri user_agent"`
-	Value   string `json:"value"`
-	Comment string `json:"comment"`
-	Enabled *bool  `json:"enabled"`
-}
-
-type BlackListListRequest struct {
-	Page     int    `form:"page,default=1"`
-	PageSize int    `form:"page_size,default=10"`
-	Type     string `form:"type"`
-	Value    string `form:"value"`
-	Enabled  *bool  `form:"enabled"`
-	TenantID uint   `form:"tenant_id"`
-}
-
+// NewBlackListService 创建黑名单服务实例
 func NewBlackListService(db *gorm.DB) *BlackListService {
 	return &BlackListService{db: db}
 }
 
 // CreateBlackList 创建黑名单
-func (s *BlackListService) CreateBlackList(req *CreateBlackListRequest) (*models.BlackList, error) {
-	blacklist := &models.BlackList{
-		Type:     req.Type,
-		Value:    req.Value,
-		Comment:  req.Comment,
-		Enabled:  req.Enabled,
-		TenantID: req.TenantID,
+func (s *BlackListService) CreateBlackList(blackList *models.BlackList) error {
+	// 检查是否已存在相同的类型、值和租户
+	var existingBlackList models.BlackList
+	err := s.db.Where("type = ? AND value = ? AND tenant_id = ?", blackList.Type, blackList.Value, blackList.TenantID).First(&existingBlackList).Error
+	if err == nil {
+		return errors.New("该黑名单条目已存在")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
-	if err := s.db.Create(blacklist).Error; err != nil {
-		return nil, err
-	}
-
-	return blacklist, nil
+	return s.db.Create(blackList).Error
 }
 
-// GetBlackListList 获取黑名单列表
-func (s *BlackListService) GetBlackListList(req *BlackListListRequest) ([]models.BlackList, int64, error) {
-	var blacklists []models.BlackList
+// GetBlackListByID 根据ID获取黑名单
+func (s *BlackListService) GetBlackListByID(id uint) (*models.BlackList, error) {
+	var blackList models.BlackList
+	err := s.db.Preload("Tenant").First(&blackList, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &blackList, nil
+}
+
+// GetBlackLists 获取黑名单列表
+func (s *BlackListService) GetBlackLists(tenantID uint, page, pageSize int, search string, listType string, value string, enabled *bool) ([]models.BlackList, int64, error) {
+	var blackLists []models.BlackList
 	var total int64
 
-	query := s.db.Model(&models.BlackList{})
+	query := s.db.Model(&models.BlackList{}).Where("tenant_id = ?", tenantID)
 
-	// 添加筛选条件
-	if req.TenantID > 0 {
-		query = query.Where("tenant_id = ?", req.TenantID)
+	// 搜索条件
+	if search != "" {
+		query = query.Where("value LIKE ? OR comment LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
-	if req.Type != "" {
-		query = query.Where("type = ?", req.Type)
+
+	// 类型筛选
+	if listType != "" {
+		query = query.Where("type = ?", listType)
 	}
-	if req.Value != "" {
-		query = query.Where("value LIKE ?", "%"+req.Value+"%")
+
+	// 值筛选
+	if value != "" {
+		query = query.Where("value LIKE ?", "%"+value+"%")
 	}
-	if req.Enabled != nil {
-		query = query.Where("enabled = ?", *req.Enabled)
+
+	// 状态筛选
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
 	}
 
 	// 获取总数
-	if err := query.Count(&total).Error; err != nil {
+	err := query.Count(&total).Error
+	if err != nil {
 		return nil, 0, err
 	}
 
 	// 分页查询
-	offset := (req.Page - 1) * req.PageSize
-	if err := query.Offset(offset).Limit(req.PageSize).
+	offset := (page - 1) * pageSize
+	err = query.Preload("Tenant").
 		Order("created_at DESC").
-		Find(&blacklists).Error; err != nil {
-		return nil, 0, err
-	}
+		Offset(offset).
+		Limit(pageSize).
+		Find(&blackLists).Error
 
-	return blacklists, total, nil
-}
-
-// GetBlackListByID 根据ID获取黑名单
-func (s *BlackListService) GetBlackListByID(id uint, tenantID uint) (*models.BlackList, error) {
-	var blacklist models.BlackList
-	query := s.db.Where("id = ?", id)
-	if tenantID > 0 {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-
-	if err := query.First(&blacklist).Error; err != nil {
-		return nil, err
-	}
-	return &blacklist, nil
+	return blackLists, total, err
 }
 
 // UpdateBlackList 更新黑名单
-func (s *BlackListService) UpdateBlackList(id uint, tenantID uint, req *UpdateBlackListRequest) (*models.BlackList, error) {
-	blacklist, err := s.GetBlackListByID(id, tenantID)
-	if err != nil {
-		return nil, err
+func (s *BlackListService) UpdateBlackList(blackList *models.BlackList) error {
+	// 检查是否已存在相同的类型、值和租户（排除当前记录）
+	var existingBlackList models.BlackList
+	err := s.db.Where("type = ? AND value = ? AND tenant_id = ? AND id != ?", blackList.Type, blackList.Value, blackList.TenantID, blackList.ID).First(&existingBlackList).Error
+	if err == nil {
+		return errors.New("该黑名单条目已存在")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
-	// 更新字段
-	if req.Type != "" {
-		blacklist.Type = req.Type
-	}
-	if req.Value != "" {
-		blacklist.Value = req.Value
-	}
-	if req.Comment != "" {
-		blacklist.Comment = req.Comment
-	}
-	if req.Enabled != nil {
-		blacklist.Enabled = *req.Enabled
-	}
-
-	if err := s.db.Save(blacklist).Error; err != nil {
-		return nil, err
-	}
-
-	return blacklist, nil
+	return s.db.Save(blackList).Error
 }
 
 // DeleteBlackList 删除黑名单
-func (s *BlackListService) DeleteBlackList(id uint, tenantID uint) error {
-	query := s.db.Where("id = ?", id)
-	if tenantID > 0 {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-
-	return query.Delete(&models.BlackList{}).Error
+func (s *BlackListService) DeleteBlackList(id uint) error {
+	return s.db.Delete(&models.BlackList{}, id).Error
 }
 
-// BatchDeleteBlackList 批量删除黑名单
-func (s *BlackListService) BatchDeleteBlackList(ids []uint, tenantID uint) error {
-	query := s.db.Where("id IN ?", ids)
-	if tenantID > 0 {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-
-	return query.Delete(&models.BlackList{}).Error
-}
-
-// ToggleBlackListStatus 切换黑名单状态
-func (s *BlackListService) ToggleBlackListStatus(id uint, tenantID uint) (*models.BlackList, error) {
-	blacklist, err := s.GetBlackListByID(id, tenantID)
+// IsIPBlacklisted 检查IP是否在黑名单中
+func (s *BlackListService) IsIPBlacklisted(ipAddress string, tenantID uint) (bool, *models.BlackList, error) {
+	var blackList models.BlackList
+	err := s.db.Where("type = ? AND value = ? AND tenant_id = ? AND enabled = ?", "ip", ipAddress, tenantID, true).First(&blackList).Error
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil, nil
+		}
+		return false, nil, err
 	}
 
-	blacklist.Enabled = !blacklist.Enabled
-	if err := s.db.Save(blacklist).Error; err != nil {
-		return nil, err
+	return true, &blackList, nil
+}
+
+// GetBlacklistedIPs 获取租户的所有黑名单IP
+func (s *BlackListService) GetBlacklistedIPs(tenantID uint) ([]string, error) {
+	var ips []string
+	err := s.db.Model(&models.BlackList{}).
+		Where("type = ? AND tenant_id = ? AND enabled = ?", "ip", tenantID, true).
+		Pluck("value", &ips).Error
+	return ips, err
+}
+
+// ToggleBlackList 切换黑名单状态
+func (s *BlackListService) ToggleBlackList(id uint) error {
+	var blackList models.BlackList
+	err := s.db.First(&blackList, id).Error
+	if err != nil {
+		return err
 	}
 
-	return blacklist, nil
+	// 切换启用状态
+	blackList.Enabled = !blackList.Enabled
+	return s.db.Save(&blackList).Error
 }

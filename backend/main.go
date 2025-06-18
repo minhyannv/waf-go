@@ -52,7 +52,7 @@ func main() {
 	redisClient := db.InitRedis(cfg)
 
 	// 初始化服务
-	services := service.NewServices(database, redisClient)
+	services := service.NewServices(database, redisClient, cfg)
 
 	// 初始化路由
 	r := router.Init(services)

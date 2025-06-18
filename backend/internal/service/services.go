@@ -1,6 +1,7 @@
 package service
 
 import (
+	"waf-go/internal/config"
 	"waf-go/internal/proxy"
 	"waf-go/internal/waf"
 
@@ -26,7 +27,7 @@ type Services struct {
 }
 
 // NewServices 创建服务集合
-func NewServices(db *gorm.DB, rdb *redis.Client) *Services {
+func NewServices(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *Services {
 	proxyManager := proxy.NewProxyManager()
 	wafEngine := waf.NewWAFEngine(db, rdb)
 	return &Services{
@@ -40,7 +41,7 @@ func NewServices(db *gorm.DB, rdb *redis.Client) *Services {
 		dashboardService:      NewDashboardService(db),
 		whiteListService:      NewWhiteListService(db),
 		blackListService:      NewBlackListService(db),
-		configService:         NewConfigService(db, rdb, nil),
+		configService:         NewConfigService(db, rdb, cfg),
 		tenantSecurityService: NewTenantSecurityService(db),
 		wafEngine:             wafEngine,
 	}

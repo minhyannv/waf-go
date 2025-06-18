@@ -1,170 +1,142 @@
 package service
 
 import (
+	"errors"
+
 	"waf-go/internal/models"
 
 	"gorm.io/gorm"
 )
 
+// WhiteListService 白名单服务
 type WhiteListService struct {
 	db *gorm.DB
 }
 
-type CreateWhiteListRequest struct {
-	Type     string `json:"type" binding:"required,oneof=ip uri user_agent"`
-	Value    string `json:"value" binding:"required"`
-	Comment  string `json:"comment"`
-	Enabled  bool   `json:"enabled"`
-	TenantID uint   `json:"tenant_id"`
-}
-
-type UpdateWhiteListRequest struct {
-	Type    string `json:"type" binding:"oneof=ip uri user_agent"`
-	Value   string `json:"value"`
-	Comment string `json:"comment"`
-	Enabled *bool  `json:"enabled"`
-}
-
-type WhiteListListRequest struct {
-	Page     int    `form:"page,default=1"`
-	PageSize int    `form:"page_size,default=10"`
-	Type     string `form:"type"`
-	Value    string `form:"value"`
-	Enabled  *bool  `form:"enabled"`
-	TenantID uint   `form:"tenant_id"`
-}
-
+// NewWhiteListService 创建白名单服务实例
 func NewWhiteListService(db *gorm.DB) *WhiteListService {
 	return &WhiteListService{db: db}
 }
 
 // CreateWhiteList 创建白名单
-func (s *WhiteListService) CreateWhiteList(req *CreateWhiteListRequest) (*models.WhiteList, error) {
-	whitelist := &models.WhiteList{
-		Type:     req.Type,
-		Value:    req.Value,
-		Comment:  req.Comment,
-		Enabled:  req.Enabled,
-		TenantID: req.TenantID,
+func (s *WhiteListService) CreateWhiteList(whiteList *models.WhiteList) error {
+	// 检查是否已存在相同的类型、值和租户
+	var existingWhiteList models.WhiteList
+	err := s.db.Where("type = ? AND value = ? AND tenant_id = ?", whiteList.Type, whiteList.Value, whiteList.TenantID).First(&existingWhiteList).Error
+	if err == nil {
+		return errors.New("该白名单条目已存在")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
-	if err := s.db.Create(whitelist).Error; err != nil {
-		return nil, err
-	}
-
-	return whitelist, nil
+	return s.db.Create(whiteList).Error
 }
 
-// GetWhiteListList 获取白名单列表
-func (s *WhiteListService) GetWhiteListList(req *WhiteListListRequest) ([]models.WhiteList, int64, error) {
-	var whitelists []models.WhiteList
+// GetWhiteListByID 根据ID获取白名单
+func (s *WhiteListService) GetWhiteListByID(id uint) (*models.WhiteList, error) {
+	var whiteList models.WhiteList
+	err := s.db.Preload("Tenant").First(&whiteList, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &whiteList, nil
+}
+
+// GetWhiteLists 获取白名单列表
+func (s *WhiteListService) GetWhiteLists(tenantID uint, page, pageSize int, search string, listType string, value string, enabled *bool) ([]models.WhiteList, int64, error) {
+	var whiteLists []models.WhiteList
 	var total int64
 
-	query := s.db.Model(&models.WhiteList{})
+	query := s.db.Model(&models.WhiteList{}).Where("tenant_id = ?", tenantID)
 
-	// 添加筛选条件
-	if req.TenantID > 0 {
-		query = query.Where("tenant_id = ?", req.TenantID)
+	// 搜索条件
+	if search != "" {
+		query = query.Where("value LIKE ? OR comment LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
-	if req.Type != "" {
-		query = query.Where("type = ?", req.Type)
+
+	// 类型筛选
+	if listType != "" {
+		query = query.Where("type = ?", listType)
 	}
-	if req.Value != "" {
-		query = query.Where("value LIKE ?", "%"+req.Value+"%")
+
+	// 值筛选
+	if value != "" {
+		query = query.Where("value LIKE ?", "%"+value+"%")
 	}
-	if req.Enabled != nil {
-		query = query.Where("enabled = ?", *req.Enabled)
+
+	// 状态筛选
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
 	}
 
 	// 获取总数
-	if err := query.Count(&total).Error; err != nil {
+	err := query.Count(&total).Error
+	if err != nil {
 		return nil, 0, err
 	}
 
 	// 分页查询
-	offset := (req.Page - 1) * req.PageSize
-	if err := query.Offset(offset).Limit(req.PageSize).
+	offset := (page - 1) * pageSize
+	err = query.Preload("Tenant").
 		Order("created_at DESC").
-		Find(&whitelists).Error; err != nil {
-		return nil, 0, err
-	}
+		Offset(offset).
+		Limit(pageSize).
+		Find(&whiteLists).Error
 
-	return whitelists, total, nil
-}
-
-// GetWhiteListByID 根据ID获取白名单
-func (s *WhiteListService) GetWhiteListByID(id uint, tenantID uint) (*models.WhiteList, error) {
-	var whitelist models.WhiteList
-	query := s.db.Where("id = ?", id)
-	if tenantID > 0 {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-
-	if err := query.First(&whitelist).Error; err != nil {
-		return nil, err
-	}
-	return &whitelist, nil
+	return whiteLists, total, err
 }
 
 // UpdateWhiteList 更新白名单
-func (s *WhiteListService) UpdateWhiteList(id uint, tenantID uint, req *UpdateWhiteListRequest) (*models.WhiteList, error) {
-	whitelist, err := s.GetWhiteListByID(id, tenantID)
-	if err != nil {
-		return nil, err
+func (s *WhiteListService) UpdateWhiteList(whiteList *models.WhiteList) error {
+	// 检查是否已存在相同的类型、值和租户（排除当前记录）
+	var existingWhiteList models.WhiteList
+	err := s.db.Where("type = ? AND value = ? AND tenant_id = ? AND id != ?", whiteList.Type, whiteList.Value, whiteList.TenantID, whiteList.ID).First(&existingWhiteList).Error
+	if err == nil {
+		return errors.New("该白名单条目已存在")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
-	// 更新字段
-	if req.Type != "" {
-		whitelist.Type = req.Type
-	}
-	if req.Value != "" {
-		whitelist.Value = req.Value
-	}
-	if req.Comment != "" {
-		whitelist.Comment = req.Comment
-	}
-	if req.Enabled != nil {
-		whitelist.Enabled = *req.Enabled
-	}
-
-	if err := s.db.Save(whitelist).Error; err != nil {
-		return nil, err
-	}
-
-	return whitelist, nil
+	return s.db.Save(whiteList).Error
 }
 
 // DeleteWhiteList 删除白名单
-func (s *WhiteListService) DeleteWhiteList(id uint, tenantID uint) error {
-	query := s.db.Where("id = ?", id)
-	if tenantID > 0 {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-
-	return query.Delete(&models.WhiteList{}).Error
+func (s *WhiteListService) DeleteWhiteList(id uint) error {
+	return s.db.Delete(&models.WhiteList{}, id).Error
 }
 
-// BatchDeleteWhiteList 批量删除白名单
-func (s *WhiteListService) BatchDeleteWhiteList(ids []uint, tenantID uint) error {
-	query := s.db.Where("id IN ?", ids)
-	if tenantID > 0 {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-
-	return query.Delete(&models.WhiteList{}).Error
-}
-
-// ToggleWhiteListStatus 切换白名单状态
-func (s *WhiteListService) ToggleWhiteListStatus(id uint, tenantID uint) (*models.WhiteList, error) {
-	whitelist, err := s.GetWhiteListByID(id, tenantID)
+// IsIPWhitelisted 检查IP是否在白名单中
+func (s *WhiteListService) IsIPWhitelisted(ipAddress string, tenantID uint) (bool, *models.WhiteList, error) {
+	var whiteList models.WhiteList
+	err := s.db.Where("type = ? AND value = ? AND tenant_id = ? AND enabled = ?", "ip", ipAddress, tenantID, true).First(&whiteList).Error
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil, nil
+		}
+		return false, nil, err
 	}
 
-	whitelist.Enabled = !whitelist.Enabled
-	if err := s.db.Save(whitelist).Error; err != nil {
-		return nil, err
+	return true, &whiteList, nil
+}
+
+// GetWhitelistedIPs 获取租户的所有白名单IP
+func (s *WhiteListService) GetWhitelistedIPs(tenantID uint) ([]string, error) {
+	var ips []string
+	err := s.db.Model(&models.WhiteList{}).
+		Where("type = ? AND tenant_id = ? AND enabled = ?", "ip", tenantID, true).
+		Pluck("value", &ips).Error
+	return ips, err
+}
+
+// ToggleWhiteList 切换白名单状态
+func (s *WhiteListService) ToggleWhiteList(id uint) error {
+	var whiteList models.WhiteList
+	err := s.db.First(&whiteList, id).Error
+	if err != nil {
+		return err
 	}
 
-	return whitelist, nil
+	// 切换启用状态
+	whiteList.Enabled = !whiteList.Enabled
+	return s.db.Save(&whiteList).Error
 }

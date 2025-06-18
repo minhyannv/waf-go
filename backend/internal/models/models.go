@@ -34,7 +34,7 @@ type User struct {
 	Tenant    *Tenant   `json:"tenant,omitempty" gorm:"foreignKey:TenantID"`                            // 关联的租户信息
 }
 
-// Domain 域名配置表 - 简化版本
+// Domain 域名配置表（简化版）
 type Domain struct {
 	ID             uint      `json:"id" gorm:"primarykey;column:id"`                                           // 域名配置ID，主键
 	Domain         string    `json:"domain" gorm:"not null;uniqueIndex;type:varchar(255);column:domain"`       // 域名，全局唯一
@@ -51,9 +51,7 @@ type Domain struct {
 	Tenant         *Tenant   `json:"tenant,omitempty" gorm:"foreignKey:TenantID"`                              // 关联的租户信息
 
 	// 多对多关系 - 通过关联表连接
-	Policies   []Policy    `json:"policies,omitempty" gorm:"many2many:domain_policies"`       // 域名关联的策略列表
-	BlackLists []BlackList `json:"black_lists,omitempty" gorm:"many2many:domain_black_lists"` // 域名关联的黑名单列表
-	WhiteLists []WhiteList `json:"white_lists,omitempty" gorm:"many2many:domain_white_lists"` // 域名关联的白名单列表
+	Policies []Policy `json:"policies,omitempty" gorm:"many2many:domain_policies"` // 域名关联的策略列表
 }
 
 // TableName 指定Domain模型使用的表名
@@ -149,32 +147,6 @@ type PolicyRule struct {
 	Rule      *Rule     `json:"rule,omitempty" gorm:"foreignKey:RuleID"`
 }
 
-// DomainBlackList 域名黑名单关联表 - 域名(Domain) ↔ 黑名单(BlackList): 多对多
-type DomainBlackList struct {
-	ID          uint       `json:"id" gorm:"primarykey;column:id"`                                                      // 关联ID，主键
-	DomainID    uint       `json:"domain_id" gorm:"not null;uniqueIndex:idx_domain_blacklist;column:domain_id"`         // 域名ID
-	BlackListID uint       `json:"black_list_id" gorm:"not null;uniqueIndex:idx_domain_blacklist;column:black_list_id"` // 黑名单ID
-	Priority    int        `json:"priority" gorm:"default:1;column:priority"`                                           // 黑名单在该域名下的优先级
-	Enabled     bool       `json:"enabled" gorm:"default:true;index;column:enabled"`                                    // 是否启用此关联
-	CreatedAt   time.Time  `json:"created_at" gorm:"column:created_at"`                                                 // 创建时间
-	UpdatedAt   time.Time  `json:"updated_at" gorm:"column:updated_at"`                                                 // 更新时间
-	Domain      *Domain    `json:"domain,omitempty" gorm:"foreignKey:DomainID"`                                         // 关联的域名配置
-	BlackList   *BlackList `json:"black_list,omitempty" gorm:"foreignKey:BlackListID"`                                  // 关联的黑名单
-}
-
-// DomainWhiteList 域名白名单关联表 - 域名(Domain) ↔ 白名单(WhiteList): 多对多
-type DomainWhiteList struct {
-	ID          uint       `json:"id" gorm:"primarykey;column:id"`                                                      // 关联ID，主键
-	DomainID    uint       `json:"domain_id" gorm:"not null;uniqueIndex:idx_domain_whitelist;column:domain_id"`         // 域名ID
-	WhiteListID uint       `json:"white_list_id" gorm:"not null;uniqueIndex:idx_domain_whitelist;column:white_list_id"` // 白名单ID
-	Priority    int        `json:"priority" gorm:"default:1;column:priority"`                                           // 白名单在该域名下的优先级
-	Enabled     bool       `json:"enabled" gorm:"default:true;index;column:enabled"`                                    // 是否启用此关联
-	CreatedAt   time.Time  `json:"created_at" gorm:"column:created_at"`                                                 // 创建时间
-	UpdatedAt   time.Time  `json:"updated_at" gorm:"column:updated_at"`                                                 // 更新时间
-	Domain      *Domain    `json:"domain,omitempty" gorm:"foreignKey:DomainID"`                                         // 关联的域名配置
-	WhiteList   *WhiteList `json:"white_list,omitempty" gorm:"foreignKey:WhiteListID"`                                  // 关联的白名单
-}
-
 // =============================================================================
 // 业务支撑表
 // =============================================================================
@@ -243,8 +215,6 @@ func AutoMigrate(db *gorm.DB) error {
 		// 多对多关联表
 		&DomainPolicy{},
 		&PolicyRule{},
-		&DomainBlackList{},
-		&DomainWhiteList{},
 		// 业务支撑表
 		&AttackLog{},
 		&RateLimit{},

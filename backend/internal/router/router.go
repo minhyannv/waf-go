@@ -52,7 +52,7 @@ func Init(services *service.Services) *gin.Engine {
 	// CORS 中间件
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Header("Content-Type", "application/json; charset=utf-8")
 
@@ -146,25 +146,25 @@ func Init(services *service.Services) *gin.Engine {
 			// 白名单管理
 			whitelists := protected.Group("/whitelists")
 			{
-				whitelists.GET("", whiteListHandler.GetWhiteListList)
+				whitelists.GET("", whiteListHandler.GetWhiteLists)
 				whitelists.POST("", whiteListHandler.CreateWhiteList)
 				whitelists.GET("/:id", whiteListHandler.GetWhiteListByID)
 				whitelists.PUT("/:id", whiteListHandler.UpdateWhiteList)
 				whitelists.DELETE("/:id", whiteListHandler.DeleteWhiteList)
-				whitelists.DELETE("/batch", whiteListHandler.BatchDeleteWhiteList)
-				whitelists.PATCH("/:id/toggle", whiteListHandler.ToggleWhiteListStatus)
+				whitelists.PATCH("/:id/toggle", whiteListHandler.ToggleWhiteList)
+				whitelists.POST("/:id/toggle", whiteListHandler.ToggleWhiteList)
 			}
 
 			// 黑名单管理
 			blacklists := protected.Group("/blacklists")
 			{
-				blacklists.GET("", blackListHandler.GetBlackListList)
+				blacklists.GET("", blackListHandler.GetBlackLists)
 				blacklists.POST("", blackListHandler.CreateBlackList)
 				blacklists.GET("/:id", blackListHandler.GetBlackListByID)
 				blacklists.PUT("/:id", blackListHandler.UpdateBlackList)
 				blacklists.DELETE("/:id", blackListHandler.DeleteBlackList)
-				blacklists.DELETE("/batch", blackListHandler.BatchDeleteBlackList)
-				blacklists.PATCH("/:id/toggle", blackListHandler.ToggleBlackListStatus)
+				blacklists.PATCH("/:id/toggle", blackListHandler.ToggleBlackList)
+				blacklists.POST("/:id/toggle", blackListHandler.ToggleBlackList)
 			}
 
 			// 系统配置

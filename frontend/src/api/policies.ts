@@ -90,7 +90,7 @@ export const policyApi = {
   },
 
   // 获取可用的规则列表
-  getAvailableRules: (): Promise<{ data: { rules: string[] } }> => {
-    return request.get('/api/v1/policies/rules')
+  getAvailableRules: (): Promise<{ data: { list: any[] } }> => {
+    return request.get('/api/v1/rules')
   }
 } 

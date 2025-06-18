@@ -316,16 +316,6 @@ func (s *DomainService) DeleteDomain(id uint) error {
 			return fmt.Errorf("删除域名策略关联失败: %v", err)
 		}
 
-		// 删除域名黑名单关联
-		if err := tx.Where("domain_id = ?", id).Delete(&models.DomainBlackList{}).Error; err != nil {
-			return fmt.Errorf("删除域名黑名单关联失败: %v", err)
-		}
-
-		// 删除域名白名单关联
-		if err := tx.Where("domain_id = ?", id).Delete(&models.DomainWhiteList{}).Error; err != nil {
-			return fmt.Errorf("删除域名白名单关联失败: %v", err)
-		}
-
 		// 删除域名
 		if err := tx.Delete(&domain).Error; err != nil {
 			return fmt.Errorf("删除域名失败: %v", err)
@@ -414,16 +404,6 @@ func (s *DomainService) BatchDeleteDomains(ids []uint) error {
 		// 删除相关联的策略关联
 		if err := tx.Where("domain_id IN ?", ids).Delete(&models.DomainPolicy{}).Error; err != nil {
 			return fmt.Errorf("删除域名策略关联失败: %v", err)
-		}
-
-		// 删除相关联的黑名单关联
-		if err := tx.Where("domain_id IN ?", ids).Delete(&models.DomainBlackList{}).Error; err != nil {
-			return fmt.Errorf("删除域名黑名单关联失败: %v", err)
-		}
-
-		// 删除相关联的白名单关联
-		if err := tx.Where("domain_id IN ?", ids).Delete(&models.DomainWhiteList{}).Error; err != nil {
-			return fmt.Errorf("删除域名白名单关联失败: %v", err)
 		}
 
 		// 删除域名配置
