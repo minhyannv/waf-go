@@ -45,7 +45,6 @@ type Domain struct {
 	BackendURL     string    `json:"backend_url" gorm:"not null;type:varchar(500);column:backend_url"`         // 后端服务地址
 	TenantID       uint      `json:"tenant_id" gorm:"not null;index;column:tenant_id"`                         // 所属租户ID
 	Enabled        bool      `json:"enabled" gorm:"default:true;index;column:enabled"`                         // 是否启用
-	WAFEnabled     bool      `json:"waf_enabled" gorm:"default:true;index;column:waf_enabled"`                 // 是否启用WAF保护
 	CreatedAt      time.Time `json:"created_at" gorm:"column:created_at"`                                      // 创建时间
 	UpdatedAt      time.Time `json:"updated_at" gorm:"column:updated_at"`                                      // 更新时间
 	Tenant         *Tenant   `json:"tenant,omitempty" gorm:"foreignKey:TenantID"`                              // 关联的租户信息
