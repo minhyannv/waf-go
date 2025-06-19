@@ -85,6 +85,7 @@ onMounted(() => {
   if (app) {
     app.classList.add('login-page')
   }
+  document.body.classList.add('login-page')
 })
 
 // 页面卸载时移除登录页面样式类
@@ -93,6 +94,7 @@ onUnmounted(() => {
   if (app) {
     app.classList.remove('login-page')
   }
+  document.body.classList.remove('login-page')
 })
 
 const handleLogin = async () => {
@@ -122,19 +124,31 @@ const handleLogin = async () => {
 </script>
 
 <style>
+/* 重置body和html的样式 */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  width: 100%;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 1000;
+  margin: 0;
+  padding: 0;
 }
 
 .login-box {
