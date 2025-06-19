@@ -370,23 +370,8 @@ const loadPolicies = async () => {
     })
 
     const response = await policyApi.getPolicyList(params)
-    console.log('策略列表响应:', response.data)
-    console.log('策略列表数据:', response.data.list)
-    
     policies.value = response.data.list
     pagination.total = response.data.total
-    
-    // 调试：检查每个策略的数据
-    policies.value.forEach((policy, index) => {
-      console.log(`策略 ${index + 1}:`, {
-        id: policy.id,
-        name: policy.name,
-        domain: policy.domain,
-        domain_id: policy.domain_id,
-        rule_ids: policy.rule_ids,
-        rule_count: getRuleCount(policy)
-      })
-    })
   } catch (error) {
     ElMessage.error('加载策略列表失败')
   } finally {
@@ -399,8 +384,6 @@ const loadAvailableRules = async () => {
   rulesLoading.value = true
   try {
     const response = await policyApi.getAvailableRules()
-    console.log('可用规则响应:', response)
-    console.log('可用规则数据:', response.data)
     
     // 确保 response.data 是数组
     if (Array.isArray(response.data)) {
@@ -409,24 +392,9 @@ const loadAvailableRules = async () => {
       // 如果返回的是分页格式
       availableRules.value = (response.data as any).list
     } else {
-      console.warn('规则数据格式异常:', response.data)
       availableRules.value = []
     }
-    
-    // 调试：检查每个规则的数据
-    availableRules.value.forEach((rule, index) => {
-      console.log(`规则 ${index + 1}:`, {
-        id: rule.id,
-        name: rule.name,
-        name_type: typeof rule.name,
-        name_length: rule.name ? rule.name.length : 0,
-        action: rule.action,
-        action_color: getActionColor(rule.action),
-        full_rule: rule
-      })
-    })
   } catch (error) {
-    console.error('加载规则列表失败:', error)
     ElMessage.error('加载规则列表失败')
   } finally {
     rulesLoading.value = false
@@ -440,7 +408,6 @@ const loadDomains = async () => {
     const response = await domainApi.getDomains({ page: 1, page_size: 100, enabled: true })
     availableDomains.value = response.data.list
   } catch (error) {
-    console.error('加载域名列表失败:', error)
     ElMessage.error('加载域名列表失败')
   } finally {
     domainsLoading.value = false
@@ -486,9 +453,6 @@ const showEditDialog = async (policy: PolicyConfig) => {
     const response = await policyApi.getPolicyWithRules(policy.id!)
     const policyDetail = response.data.policy
     
-    console.log('编辑策略详情:', policyDetail)
-    console.log('策略关联的规则ID:', policyDetail.rule_ids)
-    
     Object.assign(form, {
       name: policyDetail.name,
       description: policyDetail.description || '',
@@ -497,12 +461,8 @@ const showEditDialog = async (policy: PolicyConfig) => {
       enabled: policyDetail.enabled
     })
     
-    console.log('设置后的表单数据:', form)
-    console.log('表单中的规则ID:', form.rule_ids)
-    
     dialogVisible.value = true
   } catch (error) {
-    console.error('获取策略详情失败:', error)
     ElMessage.error('获取策略详情失败')
   }
 }
@@ -529,7 +489,6 @@ const submitForm = async () => {
 
   submitting.value = true
   try {
-    console.log('提交的表单数据:', form)
     if (isEdit.value) {
       if (currentEditingPolicyId.value) {
         await policyApi.updatePolicy(currentEditingPolicyId.value, form)
@@ -559,7 +518,6 @@ const showDetail = async (policy: PolicyConfig) => {
     currentPolicyRules.value = response.data.rules || []
     detailVisible.value = true
   } catch (error) {
-    console.error('加载策略详情失败:', error)
     ElMessage.error('加载策略详情失败')
   }
 }
@@ -660,10 +618,7 @@ const getMatchTypeText = (type: string) => {
 
 // 获取动作文本
 const getActionText = (action: string) => {
-  console.log('getActionText 输入:', action, '类型:', typeof action)
-  
   if (!action) {
-    console.warn('getActionText: action 为空或未定义')
     return '未知'
   }
   
@@ -674,7 +629,6 @@ const getActionText = (action: string) => {
   }
   
   const result = actionMap[action] || action
-  console.log('getActionText 输出:', result)
   return result
 }
 
