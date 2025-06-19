@@ -79,9 +79,16 @@ func (s *LogService) GetAttackLogList(req *LogListRequest) ([]models.AttackLog, 
 }
 
 // GetAttackLogByID 根据ID获取攻击日志详情
-func (s *LogService) GetAttackLogByID(id uint) (*models.AttackLog, error) {
+func (s *LogService) GetAttackLogByID(id uint, tenantID uint) (*models.AttackLog, error) {
 	var log models.AttackLog
-	err := s.db.Preload("Rule").Preload("Tenant").First(&log, id).Error
+	query := s.db
+
+	// 如果不是超级管理员，添加租户过滤
+	if tenantID > 0 {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+
+	err := query.First(&log, id).Error
 	return &log, err
 }
 

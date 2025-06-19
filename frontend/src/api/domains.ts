@@ -108,6 +108,11 @@ export const domainApi = {
     return request.get<DomainListResponse>('/api/v1/domains', { params })
   },
 
+  // 获取域名列表（简化版）
+  getDomains: (params: DomainListRequest): Promise<{ data: DomainListResponse }> => {
+    return request.get('/api/v1/domains', { params })
+  },
+
   // 获取域名详情
   get: (id: number): Promise<{ data: DomainConfig }> => {
     return request.get(`/api/v1/domains/${id}`)

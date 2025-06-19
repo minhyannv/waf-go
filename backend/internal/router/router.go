@@ -108,6 +108,7 @@ func Init(services *service.Services) *gin.Engine {
 				policies.GET("", policyHandler.GetPolicyList)
 				policies.POST("", policyHandler.CreatePolicy)
 				policies.GET("/:id", policyHandler.GetPolicy)
+				policies.GET("/:id/with-rules", policyHandler.GetPolicyWithRules)
 				policies.PUT("/:id", policyHandler.UpdatePolicy)
 				policies.DELETE("/:id", policyHandler.DeletePolicy)
 				policies.DELETE("/batch", policyHandler.BatchDeletePolicies)

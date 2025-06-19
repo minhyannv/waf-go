@@ -26,7 +26,7 @@ func NewPolicyHandler(policyService *service.PolicyService) *PolicyHandler {
 func (h *PolicyHandler) CreatePolicy(c *gin.Context) {
 	var req service.CreatePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.Error("CreatePolicy - 参数绑定失败", zap.Error(err))
+		logger.Error("CreatePolicy - 参数绑定失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "请求参数错误",
@@ -43,7 +43,7 @@ func (h *PolicyHandler) CreatePolicy(c *gin.Context) {
 
 	policy, err := h.policyService.CreatePolicy(&req)
 	if err != nil {
-		logger.Error("CreatePolicy - 服务层错误", zap.Error(err))
+		logger.Error("CreatePolicy - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),
@@ -65,7 +65,7 @@ func (h *PolicyHandler) CreatePolicy(c *gin.Context) {
 func (h *PolicyHandler) GetPolicyList(c *gin.Context) {
 	var req service.PolicyListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		logger.Error("GetPolicyList - 查询参数绑定失败", zap.Error(err))
+		logger.Error("GetPolicyList - 查询参数绑定失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "请求参数错误",
@@ -82,7 +82,7 @@ func (h *PolicyHandler) GetPolicyList(c *gin.Context) {
 
 	policies, total, err := h.policyService.GetPolicyList(&req)
 	if err != nil {
-		logger.Error("GetPolicyList - 服务层错误", zap.Error(err))
+		logger.Error("GetPolicyList - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),
@@ -108,7 +108,7 @@ func (h *PolicyHandler) GetPolicy(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		logger.Error("GetPolicy - ID参数解析失败", zap.Error(err))
+		logger.Error("GetPolicy - ID参数解析失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "无效的策略ID",
@@ -119,7 +119,7 @@ func (h *PolicyHandler) GetPolicy(c *gin.Context) {
 
 	policy, err := h.policyService.GetPolicyByID(uint(id))
 	if err != nil {
-		logger.Error("GetPolicy - 服务层错误", zap.Error(err))
+		logger.Error("GetPolicy - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusNotFound, gin.H{
 			"code":    404,
 			"message": "策略不存在",
@@ -140,7 +140,7 @@ func (h *PolicyHandler) GetPolicyWithRules(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		logger.Error("GetPolicyWithRules - ID参数解析失败", zap.Error(err))
+		logger.Error("GetPolicyWithRules - ID参数解析失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "无效的策略ID",
@@ -151,7 +151,7 @@ func (h *PolicyHandler) GetPolicyWithRules(c *gin.Context) {
 
 	policyWithRules, err := h.policyService.GetPolicyWithRules(uint(id))
 	if err != nil {
-		logger.Error("GetPolicyWithRules - 服务层错误", zap.Error(err))
+		logger.Error("GetPolicyWithRules - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusNotFound, gin.H{
 			"code":    404,
 			"message": "策略不存在",
@@ -172,7 +172,7 @@ func (h *PolicyHandler) UpdatePolicy(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		logger.Error("UpdatePolicy - ID参数解析失败", zap.Error(err))
+		logger.Error("UpdatePolicy - ID参数解析失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "无效的策略ID",
@@ -183,7 +183,7 @@ func (h *PolicyHandler) UpdatePolicy(c *gin.Context) {
 
 	var req service.UpdatePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.Error("UpdatePolicy - 参数绑定失败", zap.Error(err))
+		logger.Error("UpdatePolicy - 参数绑定失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "请求参数错误",
@@ -196,7 +196,7 @@ func (h *PolicyHandler) UpdatePolicy(c *gin.Context) {
 
 	policy, err := h.policyService.UpdatePolicy(uint(id), &req)
 	if err != nil {
-		logger.Error("UpdatePolicy - 服务层错误", zap.Error(err))
+		logger.Error("UpdatePolicy - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),
@@ -219,7 +219,7 @@ func (h *PolicyHandler) DeletePolicy(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		logger.Error("DeletePolicy - ID参数解析失败", zap.Error(err))
+		logger.Error("DeletePolicy - ID参数解析失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "无效的策略ID",
@@ -230,7 +230,7 @@ func (h *PolicyHandler) DeletePolicy(c *gin.Context) {
 
 	err = h.policyService.DeletePolicy(uint(id))
 	if err != nil {
-		logger.Error("DeletePolicy - 服务层错误", zap.Error(err))
+		logger.Error("DeletePolicy - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),
@@ -253,7 +253,7 @@ func (h *PolicyHandler) TogglePolicy(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		logger.Error("TogglePolicy - ID参数解析失败", zap.Error(err))
+		logger.Error("TogglePolicy - ID参数解析失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "无效的策略ID",
@@ -264,7 +264,7 @@ func (h *PolicyHandler) TogglePolicy(c *gin.Context) {
 
 	err = h.policyService.TogglePolicy(uint(id))
 	if err != nil {
-		logger.Error("TogglePolicy - 服务层错误", zap.Error(err))
+		logger.Error("TogglePolicy - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),
@@ -291,7 +291,7 @@ func (h *PolicyHandler) GetAvailableRules(c *gin.Context) {
 
 	rules, err := h.policyService.GetAvailableRules(tenantID, role)
 	if err != nil {
-		logger.Error("GetAvailableRules - 服务层错误", zap.Error(err))
+		logger.Error("GetAvailableRules - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),
@@ -314,7 +314,7 @@ func (h *PolicyHandler) BatchDeletePolicies(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.Error("BatchDeletePolicies - 参数绑定失败", zap.Error(err))
+		logger.Error("BatchDeletePolicies - 参数绑定失败: %v", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "请求参数错误",
@@ -325,7 +325,7 @@ func (h *PolicyHandler) BatchDeletePolicies(c *gin.Context) {
 
 	err := h.policyService.BatchDeletePolicies(req.IDs)
 	if err != nil {
-		logger.Error("BatchDeletePolicies - 服务层错误", zap.Error(err))
+		logger.Error("BatchDeletePolicies - 服务层错误: %v", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": err.Error(),

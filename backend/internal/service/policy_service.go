@@ -35,13 +35,14 @@ type PolicyListRequest struct {
 	Page     int    `form:"page,default=1"`
 	PageSize int    `form:"page_size,default=10"`
 	Name     string `form:"name"`
+	Domain   string `form:"domain"`
 	Enabled  *bool  `form:"enabled"`
 	TenantID uint   `form:"tenant_id"`
 }
 
 type PolicyWithRules struct {
-	models.Policy
-	Rules []models.Rule `json:"rules"`
+	Policy PolicyResponse `json:"policy"`
+	Rules  []models.Rule  `json:"rules"`
 }
 
 // PolicyResponse 策略响应结构体，将rule_ids转换为数组
@@ -192,6 +193,12 @@ func (s *PolicyService) GetPolicyList(req *PolicyListRequest) ([]PolicyResponse,
 	if req.Name != "" {
 		query = query.Where("name LIKE ?", "%"+req.Name+"%")
 	}
+	if req.Domain != "" {
+		// 通过domain_policies和domains表做关联过滤
+		query = query.Joins("JOIN domain_policies dp ON dp.policy_id = policies.id AND dp.enabled = 1").
+			Joins("JOIN domains d ON dp.domain_id = d.id").
+			Where("d.domain = ?", req.Domain)
+	}
 	if req.Enabled != nil {
 		query = query.Where("enabled = ?", *req.Enabled)
 	}
@@ -251,8 +258,46 @@ func (s *PolicyService) GetPolicyWithRules(id uint) (*PolicyWithRules, error) {
 		return nil, err
 	}
 
+	// 获取域名信息（通过domain_policies关联表）
+	var domainInfo struct {
+		DomainID uint   `gorm:"column:domain_id"`
+		Domain   string `gorm:"column:domain"`
+	}
+
+	domainErr := s.db.Raw(`
+		SELECT dp.domain_id, d.domain 
+		FROM domain_policies dp 
+		LEFT JOIN domains d ON dp.domain_id = d.id 
+		WHERE dp.policy_id = ? AND dp.enabled = 1
+	`, policy.ID).Scan(&domainInfo).Error
+
+	// 创建包含域名信息的策略响应
+	policyResponse := &PolicyResponse{
+		ID:          policy.ID,
+		Name:        policy.Name,
+		Description: policy.Description,
+		RuleIDs:     []uint{}, // 将在下面填充
+		Enabled:     policy.Enabled,
+		TenantID:    policy.TenantID,
+		CreatedAt:   policy.CreatedAt,
+		UpdatedAt:   policy.UpdatedAt,
+	}
+
+	// 如果找到域名信息，则添加到响应中
+	if domainErr == nil && domainInfo.DomainID > 0 {
+		policyResponse.DomainID = &domainInfo.DomainID
+		policyResponse.Domain = domainInfo.Domain
+	}
+
+	// 获取规则ID列表
+	var ruleIDs []uint
+	for _, rule := range rules {
+		ruleIDs = append(ruleIDs, rule.ID)
+	}
+	policyResponse.RuleIDs = ruleIDs
+
 	return &PolicyWithRules{
-		Policy: policy,
+		Policy: *policyResponse,
 		Rules:  rules,
 	}, nil
 }

@@ -9,6 +9,10 @@ export interface PolicyConfig {
   created_at?: string
   updated_at?: string
   tenant_id?: number
+  domain?: string
+  domain_id?: number
+  rule_ids?: number[]
+  toggling?: boolean
   tenant?: {
     id: number
     name: string
@@ -16,11 +20,18 @@ export interface PolicyConfig {
   }
 }
 
+// 策略详情（包含规则）
+export interface PolicyWithRules {
+  policy: PolicyConfig
+  rules: any[]
+}
+
 // 策略列表请求参数
 export interface PolicyListRequest {
   page?: number
   page_size?: number
   name?: string
+  domain?: string
   enabled?: boolean
   tenant_id?: number
 }
@@ -42,6 +53,8 @@ export interface CreatePolicyRequest {
   tenant_id?: number
   name: string
   description?: string
+  domain_id?: number
+  rule_ids?: number[]
   enabled: boolean
 }
 
@@ -49,6 +62,8 @@ export interface CreatePolicyRequest {
 export interface UpdatePolicyRequest {
   name?: string
   description?: string
+  domain_id?: number
+  rule_ids?: number[]
   enabled?: boolean
 }
 
@@ -62,6 +77,11 @@ export const policyApi = {
   // 获取策略详情
   getPolicyDetail: (id: number): Promise<{ data: PolicyConfig }> => {
     return request.get(`/api/v1/policies/${id}`)
+  },
+
+  // 获取策略详情（包含规则）
+  getPolicyWithRules: (id: number): Promise<{ data: PolicyWithRules }> => {
+    return request.get(`/api/v1/policies/${id}/with-rules`)
   },
 
   // 创建策略
@@ -90,7 +110,7 @@ export const policyApi = {
   },
 
   // 获取可用的规则列表
-  getAvailableRules: (): Promise<{ data: { list: any[] } }> => {
+  getAvailableRules: (): Promise<{ data: any[] }> => {
     return request.get('/api/v1/rules')
   }
 } 

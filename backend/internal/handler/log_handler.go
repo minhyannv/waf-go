@@ -88,7 +88,14 @@ func (h *LogHandler) GetAttackLogDetail(c *gin.Context) {
 		return
 	}
 
-	log, err := h.logService.GetAttackLogByID(uint(id))
+	// 设置租户ID
+	var tenantID uint
+	role := c.GetString("role")
+	if role != "admin" {
+		tenantID = c.GetUint("tenant_id")
+	}
+
+	log, err := h.logService.GetAttackLogByID(uint(id), tenantID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"code":    404,
