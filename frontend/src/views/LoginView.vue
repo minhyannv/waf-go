@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { login } from '@/api/auth'
@@ -78,6 +78,22 @@ const loginRules: FormRules = {
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ]
 }
+
+// 页面挂载时添加登录页面样式类
+onMounted(() => {
+  const app = document.getElementById('app')
+  if (app) {
+    app.classList.add('login-page')
+  }
+})
+
+// 页面卸载时移除登录页面样式类
+onUnmounted(() => {
+  const app = document.getElementById('app')
+  if (app) {
+    app.classList.remove('login-page')
+  }
+})
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return
